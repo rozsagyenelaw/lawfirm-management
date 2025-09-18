@@ -9,6 +9,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { path: '/tasks', icon: '✓', label: 'Tasks' },
     { path: '/calendar', icon: '📅', label: 'Calendar' },
     { path: '/documents', icon: '📄', label: 'Documents' },
+    { path: '/court-calculator', icon: '🧮', label: 'Court Calculator' },
     { path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 

@@ -12,6 +12,7 @@ import Calendar from './pages/Calendar';
 import Documents from './pages/Documents';
 import Settings from './pages/Settings';
 import CourtCalculator from './pages/CourtCalculator';
+import Kanban from './pages/Kanban';
 import { DataProvider } from './context/DataContext';
 import './styles/App.css';
 
@@ -42,6 +43,7 @@ function App() {
               <Route path="/clients" element={<Clients />} />
               <Route path="/clients/:id" element={<ClientDetail />} />
               <Route path="/tasks" element={<Tasks />} />
+              <Route path="/kanban" element={<Kanban />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/documents" element={<Documents />} />
               <Route path="/court-calculator" element={<CourtCalculator />} />

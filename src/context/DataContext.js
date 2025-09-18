@@ -26,7 +26,7 @@ export const DataProvider = ({ children }) => {
   const [syncStatus, setSyncStatus] = useState('local'); // 'local', 'syncing', 'synced'
   
   // Check if Firebase is configured
-  const useFirebase = false; // Change to true when Firebase is set up
+  const useFirebase = true; // Change to true when Firebase is set up
   
   // Load initial data from localStorage
   useEffect(() => {
@@ -604,3 +604,4 @@ function getDefaultWorkflows() {
     }
   };
 }
+

@@ -4,6 +4,7 @@ import { Users, CheckSquare, Calendar, FileText, TrendingUp, Clock, AlertCircle,
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import CourtReminders from '../components/CourtReminders';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -58,6 +59,9 @@ const Dashboard = () => {
         <h1>Dashboard</h1>
         <p>Welcome back! Here's your practice overview.</p>
       </div>
+
+      {/* Court Reminders Component */}
+      <CourtReminders />
 
       <div className="stats-grid">
         {stats.map(stat => (

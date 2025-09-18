@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Mail, Phone, MapPin, Calendar, FolderOpen, X } from 'lucide-react';
+import { Plus, Search, Filter, Mail, Phone, MapPin, Calendar, FolderOpen, X, CheckSquare, Trash2, Edit } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 
 const Clients = () => {
   const navigate = useNavigate();
-  const { clients, addClient, deleteClient } = useData();
+  const { clients, addClient, deleteClient, updateClient } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedClients, setSelectedClients] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -56,6 +58,64 @@ const Clients = () => {
     });
   };
 
+  const handleSelectClient = (clientId) => {
+    if (selectedClients.includes(clientId)) {
+      setSelectedClients(selectedClients.filter(id => id !== clientId));
+    } else {
+      setSelectedClients([...selectedClients, clientId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedClients.length === filteredClients.length) {
+      setSelectedClients([]);
+    } else {
+      setSelectedClients(filteredClients.map(c => c.id));
+    }
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedClients.length === 0) return;
+    if (window.confirm(`Delete ${selectedClients.length} clients? This will also delete all associated tasks, documents, and events. This cannot be undone.`)) {
+      selectedClients.forEach(clientId => {
+        deleteClient(clientId);
+      });
+      setSelectedClients([]);
+      setSelectMode(false);
+    }
+  };
+
+  const handleBatchCategoryUpdate = () => {
+    if (selectedClients.length === 0) return;
+    const newCategory = prompt('Select new category:\n1. estate-planning\n2. probate\n3. trust-litigation\n4. conservatorship\n5. guardianship\n6. fire-victim\n\nEnter the category name:');
+    if (newCategory && categories.find(c => c.value === newCategory)) {
+      selectedClients.forEach(clientId => {
+        updateClient(clientId, { category: newCategory });
+      });
+      setSelectedClients([]);
+      setSelectMode(false);
+    }
+  };
+
+  const handleBatchExport = () => {
+    if (selectedClients.length === 0) return;
+    const selectedData = clients.filter(c => selectedClients.includes(c.id));
+    const csv = [
+      ['Name', 'Email', 'Phone', 'Address', 'Category', 'Notes'],
+      ...selectedData.map(c => [c.name, c.email, c.phone, c.address, c.category, c.notes])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clients_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    
+    setSelectedClients([]);
+    setSelectMode(false);
+  };
+
   return (
     <div className="clients-page">
       <div className="page-header">
@@ -63,11 +123,61 @@ const Clients = () => {
           <h1>Clients</h1>
           <p>Manage your client database</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={20} />
-          Add Client
-        </button>
+        <div className="header-actions">
+          {!selectMode ? (
+            <>
+              <button className="btn-secondary" onClick={() => {
+                setSelectMode(true);
+                setSelectedClients([]);
+              }}>
+                <CheckSquare size={20} />
+                Select
+              </button>
+              <button className="btn-primary" onClick={() => setShowAddModal(true)}>
+                <Plus size={20} />
+                Add Client
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn-text" onClick={() => {
+                setSelectMode(false);
+                setSelectedClients([]);
+              }}>
+                Cancel
+              </button>
+              <span className="selected-count">{selectedClients.length} selected</span>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Batch Actions Bar */}
+      {selectMode && (
+        <div className="batch-actions-bar">
+          <div className="batch-actions-group">
+            <button className="btn-text" onClick={handleSelectAll}>
+              {selectedClients.length === filteredClients.length ? 'Deselect All' : 'Select All'}
+            </button>
+            {selectedClients.length > 0 && (
+              <>
+                <button className="btn-secondary" onClick={handleBatchCategoryUpdate}>
+                  <Edit size={18} />
+                  Change Category
+                </button>
+                <button className="btn-secondary" onClick={handleBatchExport}>
+                  <FolderOpen size={18} />
+                  Export CSV
+                </button>
+                <button className="btn-danger" onClick={handleBatchDelete}>
+                  <Trash2 size={18} />
+                  Delete Selected
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="controls-bar">
         <div className="search-box">
@@ -95,61 +205,82 @@ const Clients = () => {
 
       <div className="clients-grid">
         {filteredClients.length > 0 ? (
-          filteredClients.map(client => (
-            <div 
-              key={client.id} 
-              className="client-card"
-              onClick={() => navigate(`/clients/${client.id}`)}
-            >
-              <div className="client-header">
-                <div className="client-avatar">
-                  {client.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="client-info">
-                  <h3>{client.name}</h3>
-                  <span className={`category-badge ${client.category}`}>
-                    {categories.find(c => c.value === client.category)?.label}
-                  </span>
-                </div>
-              </div>
-              <div className="client-details">
-                {client.email && (
-                  <div className="detail-item">
-                    <Mail size={16} />
-                    <span>{client.email}</span>
-                  </div>
-                )}
-                {client.phone && (
-                  <div className="detail-item">
-                    <Phone size={16} />
-                    <span>{client.phone}</span>
-                  </div>
-                )}
-                {client.address && (
-                  <div className="detail-item">
-                    <MapPin size={16} />
-                    <span>{client.address}</span>
-                  </div>
-                )}
-                <div className="detail-item">
-                  <Calendar size={16} />
-                  <span>Added {format(new Date(client.createdAt), 'MMM dd, yyyy')}</span>
-                </div>
-              </div>
-              <div className="client-actions">
-                <button 
-                  className="btn-text"
-                  onClick={(e) => {
-                    e.stopPropagation();
+          filteredClients.map(client => {
+            const isSelected = selectedClients.includes(client.id);
+            return (
+              <div 
+                key={client.id} 
+                className={`client-card ${isSelected ? 'selected' : ''}`}
+                onClick={() => {
+                  if (selectMode) {
+                    handleSelectClient(client.id);
+                  } else {
                     navigate(`/clients/${client.id}`);
-                  }}
-                >
-                  <FolderOpen size={16} />
-                  View Details
-                </button>
+                  }
+                }}
+              >
+                {selectMode && (
+                  <div className="client-select-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleSelectClient(client.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                )}
+                <div className="client-header">
+                  <div className="client-avatar">
+                    {client.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="client-info">
+                    <h3>{client.name}</h3>
+                    <span className={`category-badge ${client.category}`}>
+                      {categories.find(c => c.value === client.category)?.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="client-details">
+                  {client.email && (
+                    <div className="detail-item">
+                      <Mail size={16} />
+                      <span>{client.email}</span>
+                    </div>
+                  )}
+                  {client.phone && (
+                    <div className="detail-item">
+                      <Phone size={16} />
+                      <span>{client.phone}</span>
+                    </div>
+                  )}
+                  {client.address && (
+                    <div className="detail-item">
+                      <MapPin size={16} />
+                      <span>{client.address}</span>
+                    </div>
+                  )}
+                  <div className="detail-item">
+                    <Calendar size={16} />
+                    <span>Added {format(new Date(client.createdAt), 'MMM dd, yyyy')}</span>
+                  </div>
+                </div>
+                {!selectMode && (
+                  <div className="client-actions">
+                    <button 
+                      className="btn-text"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/clients/${client.id}`);
+                      }}
+                    >
+                      <FolderOpen size={16} />
+                      View Details
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="empty-state">
             <p>No clients found</p>

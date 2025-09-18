@@ -1085,7 +1085,8 @@ body {
   font-weight: bold;
 }
 
-/* Batch Operations */
+/* ALL BATCH OPERATIONS STYLES TOGETHER */
+/* Batch Operations Base */
 .batch-actions {
   position: fixed;
   bottom: 20px;
@@ -1107,6 +1108,117 @@ body {
 .batch-count {
   font-weight: 600;
   color: var(--primary);
+}
+
+/* Batch Operations for Tasks */
+.section-header-with-select {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.select-all-btn {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.select-all-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.task-select-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.task-card.selected {
+  background: #EBF5FF;
+  border: 2px solid var(--primary);
+}
+
+.selected-count {
+  padding: 8px 16px;
+  background: var(--primary);
+  color: white;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.batch-actions-bar {
+  background: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.batch-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.batch-priority-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.batch-priority-group span {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.batch-priority-group button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.task-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.tasks-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Client Batch Operations */
+.client-card.selected {
+  background: #EBF5FF;
+  border: 2px solid var(--primary);
+  position: relative;
+}
+
+.client-select-checkbox {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.client-select-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
 }
 
 /* Global Search */

@@ -10,6 +10,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { path: '/calendar', icon: '📅', label: 'Calendar' },
     { path: '/documents', icon: '📄', label: 'Documents' },
     { path: '/court-calculator', icon: '🧮', label: 'Court Calculator' },
+    { path: '/kanban', icon: '📋', label: 'Kanban Board' },
     { path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
@@ -46,3 +47,4 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
 };
 
 export default Sidebar;
+

@@ -16,6 +16,8 @@ const Tasks = () => {
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [selectMode, setSelectMode] = useState(false);
   const [filteredByAdvanced, setFilteredByAdvanced] = useState(null);
+  const [showTimeTracker, setShowTimeTracker] = useState(false);
+  const [trackingTask, setTrackingTask] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -174,6 +176,22 @@ const Tasks = () => {
     }
   };
 
+  const handleSaveTime = (timeData) => {
+    updateTask(timeData.taskId, {
+      timeSessions: timeData.sessions,
+      totalDuration: timeData.totalDuration,
+      totalBillable: timeData.totalBillable,
+      hourlyRate: timeData.hourlyRate
+    });
+    setShowTimeTracker(false);
+    setTrackingTask(null);
+  };
+
+  const handleOpenTimeTracker = (task) => {
+    setTrackingTask(task);
+    setShowTimeTracker(true);
+  };
+
   const renderTaskGroup = (title, tasks, colorClass = '') => {
     if (tasks.length === 0) return null;
     
@@ -218,6 +236,9 @@ const Tasks = () => {
                   <h4 className={task.completed ? 'line-through' : ''}>{task.title}</h4>
                   {!selectMode && (
                     <div className="task-actions">
+                      <button className="btn-icon" onClick={() => handleOpenTimeTracker(task)} title="Track Time">
+                        <Clock size={16} />
+                      </button>
                       <button className="btn-icon" onClick={() => handleEdit(task)}>
                         <Edit size={16} />
                       </button>
@@ -241,6 +262,13 @@ const Tasks = () => {
                     <Calendar size={14} />
                     {format(new Date(task.dueDate), 'MMM dd, yyyy')}
                   </span>
+                  {task.totalDuration && (
+                    <span className="task-time-info">
+                      <Clock size={12} />
+                      {Math.floor(task.totalDuration / 3600)}h {Math.floor((task.totalDuration % 3600) / 60)}m
+                      {task.totalBillable && ` • $${task.totalBillable.toFixed(2)}`}
+                    </span>
+                  )}
                   {task.category && (
                     <span className={`category-badge ${task.category}`}>
                       {categories.find(c => c.value === task.category)?.label}
@@ -474,9 +502,24 @@ const Tasks = () => {
           </div>
         </div>
       )}
+
+      {/* Time Tracker Modal */}
+      {showTimeTracker && trackingTask && (
+        <div className="modal-overlay" onClick={() => setShowTimeTracker(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <TimeTracker
+              task={trackingTask}
+              onSaveTime={handleSaveTime}
+              onClose={() => {
+                setShowTimeTracker(false);
+                setTrackingTask(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default Tasks;
-

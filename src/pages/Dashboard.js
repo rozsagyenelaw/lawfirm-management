@@ -26,6 +26,7 @@ const Dashboard = () => {
     'probate': { name: 'Probate', count: 0, color: '#10B981' },
     'trust-litigation': { name: 'Trust Litigation', count: 0, color: '#F59E0B' },
     'conservatorship': { name: 'Conservatorship', count: 0, color: '#8B5CF6' },
+    'guardianship': { name: 'Guardianship', count: 0, color: '#1E40AF' },
     'fire-victim': { name: 'Fire Victim', count: 0, color: '#EF4444' }
   };
 

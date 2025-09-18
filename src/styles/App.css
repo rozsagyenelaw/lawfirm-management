@@ -1300,12 +1300,12 @@ body {
 /* Global Search */
 .global-search-trigger {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  bottom: 30px;  /* Move to bottom */
+  right: 30px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 10px 20px;
   background: white;
   border: 2px solid var(--primary);
   border-radius: 25px;
@@ -1313,16 +1313,17 @@ body {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transition: all 0.2s;
-  z-index: 90; /* Reduced from 100 to be below sidebar */
+  z-index: 90;
 }
 
 .global-search-trigger:hover {
   background: var(--primary);
   color: white;
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+
 }
 
 .global-search-trigger kbd {
@@ -1957,5 +1958,6 @@ input:checked + .slider:before {
     grid-column: span 1;
   }
 }
+
 
 

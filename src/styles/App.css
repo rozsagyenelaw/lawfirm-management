@@ -1315,7 +1315,7 @@ body {
   cursor: pointer;
   box-shadow: var(--shadow);
   transition: all 0.2s;
-  z-index: 100;
+  z-index: 90; /* Reduced from 100 to be below sidebar */
 }
 
 .global-search-trigger:hover {
@@ -1957,4 +1957,5 @@ input:checked + .slider:before {
     grid-column: span 1;
   }
 }
+
 

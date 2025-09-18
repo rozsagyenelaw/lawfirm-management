@@ -2,6 +2,10 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 
+// Firebase imports (uncomment when ready to use Firebase)
+// import { db } from '../config/firebase';
+// import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
+
 const DataContext = createContext();
 
 export const useData = () => {
@@ -13,48 +17,154 @@ export const useData = () => {
 };
 
 export const DataProvider = ({ children }) => {
-  const [clients, setClients] = useState(() => {
-    const saved = localStorage.getItem('clients');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('tasks');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [events, setEvents] = useState(() => {
-    const saved = localStorage.getItem('events');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [documents, setDocuments] = useState(() => {
-    const saved = localStorage.getItem('documents');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [workflows] = useState(() => {
-    const saved = localStorage.getItem('workflows');
-    return saved ? JSON.parse(saved) : getDefaultWorkflows();
-  });
+  const [clients, setClients] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [workflows] = useState(getDefaultWorkflows());
+  const [isOnline, setIsOnline] = useState(true);
+  const [syncStatus, setSyncStatus] = useState('local'); // 'local', 'syncing', 'synced'
+  
+  // Check if Firebase is configured
+  const useFirebase = false; // Change to true when Firebase is set up
+  
+  // Load initial data from localStorage
+  useEffect(() => {
+    if (!useFirebase) {
+      // Local storage mode
+      const savedClients = localStorage.getItem('clients');
+      const savedTasks = localStorage.getItem('tasks');
+      const savedEvents = localStorage.getItem('events');
+      const savedDocuments = localStorage.getItem('documents');
+      
+      setClients(savedClients ? JSON.parse(savedClients) : []);
+      setTasks(savedTasks ? JSON.parse(savedTasks) : []);
+      setEvents(savedEvents ? JSON.parse(savedEvents) : []);
+      setDocuments(savedDocuments ? JSON.parse(savedDocuments) : []);
+      setSyncStatus('local');
+    } else {
+      // Firebase mode - uncomment when ready
+      /*
+      setSyncStatus('syncing');
+      
+      // Real-time sync for clients
+      const unsubClients = onSnapshot(
+        query(collection(db, 'clients'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          const clientsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setClients(clientsList);
+          localStorage.setItem('clients', JSON.stringify(clientsList)); // Offline backup
+        },
+        (error) => {
+          console.error('Error syncing clients:', error);
+          loadFromLocalStorage();
+        }
+      );
+      
+      // Real-time sync for tasks
+      const unsubTasks = onSnapshot(
+        query(collection(db, 'tasks'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          const tasksList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setTasks(tasksList);
+          localStorage.setItem('tasks', JSON.stringify(tasksList));
+        }
+      );
+      
+      // Real-time sync for events
+      const unsubEvents = onSnapshot(
+        query(collection(db, 'events'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          const eventsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setEvents(eventsList);
+          localStorage.setItem('events', JSON.stringify(eventsList));
+        }
+      );
+      
+      // Real-time sync for documents
+      const unsubDocs = onSnapshot(
+        query(collection(db, 'documents'), orderBy('uploadedAt', 'desc')),
+        (snapshot) => {
+          const docsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setDocuments(docsList);
+          localStorage.setItem('documents', JSON.stringify(docsList));
+        }
+      );
+      
+      setSyncStatus('synced');
+      
+      return () => {
+        unsubClients();
+        unsubTasks();
+        unsubEvents();
+        unsubDocs();
+      };
+      */
+    }
+  }, [useFirebase]);
+  
+  // Save to localStorage when data changes (local mode)
+  useEffect(() => {
+    if (!useFirebase) {
+      localStorage.setItem('clients', JSON.stringify(clients));
+    }
+  }, [clients, useFirebase]);
 
   useEffect(() => {
-    localStorage.setItem('clients', JSON.stringify(clients));
-  }, [clients]);
+    if (!useFirebase) {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+  }, [tasks, useFirebase]);
 
   useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    if (!useFirebase) {
+      localStorage.setItem('events', JSON.stringify(events));
+    }
+  }, [events, useFirebase]);
 
   useEffect(() => {
-    localStorage.setItem('events', JSON.stringify(events));
-  }, [events]);
-
+    if (!useFirebase) {
+      localStorage.setItem('documents', JSON.stringify(documents));
+    }
+  }, [documents, useFirebase]);
+  
+  // Monitor online status
   useEffect(() => {
-    localStorage.setItem('documents', JSON.stringify(documents));
-  }, [documents]);
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('Back online - data syncing');
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast('Working offline - changes will sync when reconnected', {
+        icon: '📵'
+      });
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
-  const addClient = (clientData) => {
+  // Add client function - works with both local and Firebase
+  const addClient = async (clientData) => {
     const newClient = {
       id: uuidv4(),
       ...clientData,
@@ -63,12 +173,30 @@ export const DataProvider = ({ children }) => {
       documents: [],
       events: []
     };
-    setClients([...clients, newClient]);
     
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        const docRef = await setDoc(doc(db, 'clients', newClient.id), newClient);
+        toast.success('Client added and synced');
+      } catch (error) {
+        console.error('Error adding client to Firebase:', error);
+        toast.error('Error syncing - saved locally');
+        setClients([...clients, newClient]);
+      }
+      */
+    } else {
+      // Local mode or offline
+      setClients([...clients, newClient]);
+      toast.success('Client added successfully');
+    }
+    
+    // Create workflow tasks
     const workflow = workflows[clientData.category];
     if (workflow) {
-      workflow.tasks.forEach(taskTemplate => {
-        addTask({
+      for (const taskTemplate of workflow.tasks) {
+        await addTask({
           clientId: newClient.id,
           title: taskTemplate.name,
           description: taskTemplate.description,
@@ -77,95 +205,249 @@ export const DataProvider = ({ children }) => {
           dueDate: calculateDueDate(taskTemplate.daysFromStart),
           category: clientData.category
         });
-      });
+      }
     }
     
-    toast.success('Client added successfully');
     return newClient;
   };
 
-  const updateClient = (id, updates) => {
-    setClients(clients.map(client => 
-      client.id === id ? { ...client, ...updates } : client
-    ));
-    toast.success('Client updated');
+  const updateClient = async (id, updates) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await updateDoc(doc(db, 'clients', id), updates);
+        toast.success('Client updated and synced');
+      } catch (error) {
+        console.error('Error updating client:', error);
+        toast.error('Error syncing - saved locally');
+        setClients(clients.map(client => 
+          client.id === id ? { ...client, ...updates } : client
+        ));
+      }
+      */
+    } else {
+      setClients(clients.map(client => 
+        client.id === id ? { ...client, ...updates } : client
+      ));
+      toast.success('Client updated');
+    }
   };
 
-  const deleteClient = (id) => {
-    setClients(clients.filter(client => client.id !== id));
-    setTasks(tasks.filter(task => task.clientId !== id));
-    setDocuments(documents.filter(doc => doc.clientId !== id));
-    setEvents(events.filter(event => event.clientId !== id));
-    toast.success('Client deleted');
+  const deleteClient = async (id) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await deleteDoc(doc(db, 'clients', id));
+        // Also delete related data
+        const clientTasks = tasks.filter(task => task.clientId === id);
+        const clientDocs = documents.filter(doc => doc.clientId === id);
+        const clientEvents = events.filter(event => event.clientId === id);
+        
+        for (const task of clientTasks) {
+          await deleteDoc(doc(db, 'tasks', task.id));
+        }
+        for (const document of clientDocs) {
+          await deleteDoc(doc(db, 'documents', document.id));
+        }
+        for (const event of clientEvents) {
+          await deleteDoc(doc(db, 'events', event.id));
+        }
+        
+        toast.success('Client deleted and synced');
+      } catch (error) {
+        console.error('Error deleting client:', error);
+        toast.error('Error syncing - deleted locally');
+      }
+      */
+    } else {
+      setClients(clients.filter(client => client.id !== id));
+      setTasks(tasks.filter(task => task.clientId !== id));
+      setDocuments(documents.filter(doc => doc.clientId !== id));
+      setEvents(events.filter(event => event.clientId !== id));
+      toast.success('Client deleted');
+    }
   };
 
-  const addTask = (taskData) => {
+  const addTask = async (taskData) => {
     const newTask = {
       id: uuidv4(),
       ...taskData,
       createdAt: new Date().toISOString(),
       completed: false
     };
-    setTasks([...tasks, newTask]);
+    
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await setDoc(doc(db, 'tasks', newTask.id), newTask);
+      } catch (error) {
+        console.error('Error adding task:', error);
+        setTasks([...tasks, newTask]);
+      }
+      */
+    } else {
+      setTasks([...tasks, newTask]);
+    }
+    
     return newTask;
   };
 
-  const updateTask = (id, updates) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, ...updates } : task
-    ));
-    toast.success('Task updated');
+  const updateTask = async (id, updates) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await updateDoc(doc(db, 'tasks', id), updates);
+        toast.success('Task updated');
+      } catch (error) {
+        console.error('Error updating task:', error);
+        setTasks(tasks.map(task => 
+          task.id === id ? { ...task, ...updates } : task
+        ));
+      }
+      */
+    } else {
+      setTasks(tasks.map(task => 
+        task.id === id ? { ...task, ...updates } : task
+      ));
+      toast.success('Task updated');
+    }
   };
 
-  const deleteTask = (id) => {
-    setTasks(tasks.filter(task => task.id !== id));
-    toast.success('Task deleted');
+  const deleteTask = async (id) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await deleteDoc(doc(db, 'tasks', id));
+        toast.success('Task deleted');
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        setTasks(tasks.filter(task => task.id !== id));
+      }
+      */
+    } else {
+      setTasks(tasks.filter(task => task.id !== id));
+      toast.success('Task deleted');
+    }
   };
 
   const completeTask = (id) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: true, status: 'completed' } : task
-    ));
+    updateTask(id, { completed: true, status: 'completed' });
     toast.success('Task marked as complete');
   };
 
-  const addEvent = (eventData) => {
+  const addEvent = async (eventData) => {
     const newEvent = {
       id: uuidv4(),
       ...eventData,
       createdAt: new Date().toISOString()
     };
-    setEvents([...events, newEvent]);
-    toast.success('Event added to calendar');
+    
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await setDoc(doc(db, 'events', newEvent.id), newEvent);
+        toast.success('Event added to calendar');
+      } catch (error) {
+        console.error('Error adding event:', error);
+        setEvents([...events, newEvent]);
+      }
+      */
+    } else {
+      setEvents([...events, newEvent]);
+      toast.success('Event added to calendar');
+    }
+    
     return newEvent;
   };
 
-  const updateEvent = (id, updates) => {
-    setEvents(events.map(event => 
-      event.id === id ? { ...event, ...updates } : event
-    ));
-    toast.success('Event updated');
+  const updateEvent = async (id, updates) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await updateDoc(doc(db, 'events', id), updates);
+        toast.success('Event updated');
+      } catch (error) {
+        console.error('Error updating event:', error);
+        setEvents(events.map(event => 
+          event.id === id ? { ...event, ...updates } : event
+        ));
+      }
+      */
+    } else {
+      setEvents(events.map(event => 
+        event.id === id ? { ...event, ...updates } : event
+      ));
+      toast.success('Event updated');
+    }
   };
 
-  const deleteEvent = (id) => {
-    setEvents(events.filter(event => event.id !== id));
-    toast.success('Event deleted');
+  const deleteEvent = async (id) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await deleteDoc(doc(db, 'events', id));
+        toast.success('Event deleted');
+      } catch (error) {
+        console.error('Error deleting event:', error);
+        setEvents(events.filter(event => event.id !== id));
+      }
+      */
+    } else {
+      setEvents(events.filter(event => event.id !== id));
+      toast.success('Event deleted');
+    }
   };
 
-  const addDocument = (docData) => {
+  const addDocument = async (docData) => {
     const newDoc = {
       id: uuidv4(),
       ...docData,
       uploadedAt: new Date().toISOString()
     };
-    setDocuments([...documents, newDoc]);
-    toast.success('Document added');
+    
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await setDoc(doc(db, 'documents', newDoc.id), newDoc);
+        toast.success('Document added');
+      } catch (error) {
+        console.error('Error adding document:', error);
+        setDocuments([...documents, newDoc]);
+      }
+      */
+    } else {
+      setDocuments([...documents, newDoc]);
+      toast.success('Document added');
+    }
+    
     return newDoc;
   };
 
-  const deleteDocument = (id) => {
-    setDocuments(documents.filter(doc => doc.id !== id));
-    toast.success('Document deleted');
+  const deleteDocument = async (id) => {
+    if (useFirebase && isOnline) {
+      // Firebase mode - uncomment when ready
+      /*
+      try {
+        await deleteDoc(doc(db, 'documents', id));
+        toast.success('Document deleted');
+      } catch (error) {
+        console.error('Error deleting document:', error);
+        setDocuments(documents.filter(doc => doc.id !== id));
+      }
+      */
+    } else {
+      setDocuments(documents.filter(doc => doc.id !== id));
+      toast.success('Document deleted');
+    }
   };
 
   const calculateDueDate = (daysFromStart) => {
@@ -215,6 +497,8 @@ export const DataProvider = ({ children }) => {
     events,
     documents,
     workflows,
+    isOnline,
+    syncStatus,
     addClient,
     updateClient,
     deleteClient,

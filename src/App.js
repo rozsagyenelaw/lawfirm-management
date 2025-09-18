@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Sidebar from './components/Sidebar';
+import GlobalSearch from './components/GlobalSearch';
 import Dashboard from './pages/Dashboard';
 import DailyDigest from './pages/DailyDigest';
 import Clients from './pages/Clients';
@@ -31,6 +32,7 @@ function App() {
             }}
           />
           <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+          <GlobalSearch />
           <main className={`main-content ${collapsed ? 'expanded' : ''}`}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

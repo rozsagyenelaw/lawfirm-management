@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Save, Download, Upload, Trash2, Bell, Moon, Sun, Globe, Lock, Database, AlertCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';  // ADD THIS LINE
 
 const Settings = () => {
   const { clients, tasks, events, documents } = useData();
@@ -9,10 +10,10 @@ const Settings = () => {
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('appSettings');
     return saved ? JSON.parse(saved) : {
-      firmName: '',
-      email: '',
-      phone: '',
-      address: '',
+      firmName: 'Law Offices of Rozsa Gyene',  // Added your firm info
+      email: 'rozsagyenelaw@yahoo.com',
+      phone: '(818) 291-6217',
+      address: '450 N Brand Blvd. Suite 600\nGlendale, CA 91203',
       theme: 'light',
       notifications: true,
       emailReminders: true,
@@ -73,7 +74,7 @@ const Settings = () => {
 
   const clearAllData = () => {
     if (window.confirm('Are you sure you want to delete all data? This cannot be undone!')) {
-      if (window.confirm('This will delete ALL clients, tasks, events, and documents. Type "DELETE" to confirm.')) {
+      if (window.confirm('This will delete ALL clients, tasks, events, and documents. Are you absolutely sure?')) {
         localStorage.clear();
         toast.success('All data cleared. Refreshing...');
         setTimeout(() => window.location.reload(), 2000);
@@ -81,13 +82,7 @@ const Settings = () => {
     }
   };
 
-  const format = (date, pattern) => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // REMOVE THE CUSTOM FORMAT FUNCTION - WE'RE USING DATE-FNS NOW
 
   return (
     <div className="settings-page">
@@ -198,8 +193,8 @@ const Settings = () => {
               <div className="settings-options">
                 <div className="option-item">
                   <div className="option-info">
-                    <h3>Push Notifications</h3>
-                    <p>Receive notifications for tasks and events</p>
+                    <h3>Court Date Reminders (10 days)</h3>
+                    <p>Get notified 10 days before court dates to clear notes</p>
                   </div>
                   <label className="switch">
                     <input
@@ -212,8 +207,8 @@ const Settings = () => {
                 </div>
                 <div className="option-item">
                   <div className="option-info">
-                    <h3>Email Reminders</h3>
-                    <p>Send email reminders for upcoming tasks</p>
+                    <h3>Court Date Reminders (1 day)</h3>
+                    <p>Get notified 1 day before court dates</p>
                   </div>
                   <label className="switch">
                     <input
@@ -294,9 +289,9 @@ const Settings = () => {
               <div className="warning-box">
                 <AlertCircle size={20} />
                 <p>
-                  <strong>Warning:</strong> Data is stored locally in your browser. 
+                  <strong>Important:</strong> Export your data regularly! Data is stored locally in your browser. 
                   Clearing browser data or using a different browser will result in data loss. 
-                  Regular exports are recommended.
+                  Export your data now to prevent losing your clients and tasks.
                 </p>
               </div>
             </div>

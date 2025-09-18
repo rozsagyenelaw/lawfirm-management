@@ -2736,6 +2736,117 @@ input:checked + .slider:before {
   color: var(--text);
   margin-bottom: 15px;
 }
+/* Court Date Calculator */
+.court-date-calculator {
+  background: white;
+  border-radius: 8px;
+  padding: 30px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.calculator-header {
+  margin-bottom: 30px;
+}
+
+.calculator-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.calculator-inputs {
+  background: var(--light);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.calculated-results {
+  margin-top: 30px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.results-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.deadlines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.deadline-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 15px;
+  background: var(--light);
+  border-radius: 8px;
+  border-left: 3px solid var(--primary);
+}
+
+.deadline-date {
+  text-align: center;
+  min-width: 60px;
+}
+
+.date-display {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.date-year {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.deadline-info {
+  flex: 1;
+}
+
+.deadline-info h4 {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.deadline-info p {
+  font-size: 14px;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+
+.deadline-meta {
+  font-size: 12px;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+.calculator-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 15px;
+  background: #FEF3C7;
+  border-radius: 6px;
+  color: #92400E;
+}
+
+.calculator-note p {
+  font-size: 13px;
+  line-height: 1.5;
+}
 
 
 

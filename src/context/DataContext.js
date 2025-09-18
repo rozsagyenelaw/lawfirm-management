@@ -2,9 +2,9 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 
-// Firebase imports (uncomment when ready to use Firebase)
-// import { db } from '../config/firebase';
-// import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
+// Firebase imports
+import { db } from '../config/firebase';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 
 const DataContext = createContext();
 
@@ -26,9 +26,9 @@ export const DataProvider = ({ children }) => {
   const [syncStatus, setSyncStatus] = useState('local'); // 'local', 'syncing', 'synced'
   
   // Check if Firebase is configured
-  const useFirebase = true; // Change to true when Firebase is set up
+  const useFirebase = true; // Firebase is now enabled
   
-  // Load initial data from localStorage
+  // Load initial data
   useEffect(() => {
     if (!useFirebase) {
       // Local storage mode
@@ -43,13 +43,24 @@ export const DataProvider = ({ children }) => {
       setDocuments(savedDocuments ? JSON.parse(savedDocuments) : []);
       setSyncStatus('local');
     } else {
-      // Firebase mode - uncomment when ready
-      /*
+      // Firebase mode
       setSyncStatus('syncing');
+      
+      // Load existing localStorage data first (for migration)
+      const localClients = JSON.parse(localStorage.getItem('clients') || '[]');
+      const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+      const localEvents = JSON.parse(localStorage.getItem('events') || '[]');
+      const localDocuments = JSON.parse(localStorage.getItem('documents') || '[]');
+      
+      // Set local data immediately
+      setClients(localClients);
+      setTasks(localTasks);
+      setEvents(localEvents);
+      setDocuments(localDocuments);
       
       // Real-time sync for clients
       const unsubClients = onSnapshot(
-        query(collection(db, 'clients'), orderBy('createdAt', 'desc')),
+        collection(db, 'clients'),
         (snapshot) => {
           const clientsList = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -60,13 +71,13 @@ export const DataProvider = ({ children }) => {
         },
         (error) => {
           console.error('Error syncing clients:', error);
-          loadFromLocalStorage();
+          // Keep using local data if Firebase fails
         }
       );
       
       // Real-time sync for tasks
       const unsubTasks = onSnapshot(
-        query(collection(db, 'tasks'), orderBy('createdAt', 'desc')),
+        collection(db, 'tasks'),
         (snapshot) => {
           const tasksList = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -79,7 +90,7 @@ export const DataProvider = ({ children }) => {
       
       // Real-time sync for events
       const unsubEvents = onSnapshot(
-        query(collection(db, 'events'), orderBy('createdAt', 'desc')),
+        collection(db, 'events'),
         (snapshot) => {
           const eventsList = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -92,7 +103,7 @@ export const DataProvider = ({ children }) => {
       
       // Real-time sync for documents
       const unsubDocs = onSnapshot(
-        query(collection(db, 'documents'), orderBy('uploadedAt', 'desc')),
+        collection(db, 'documents'),
         (snapshot) => {
           const docsList = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -105,13 +116,43 @@ export const DataProvider = ({ children }) => {
       
       setSyncStatus('synced');
       
+      // Migrate existing localStorage data to Firebase
+      if (localClients.length > 0) {
+        localClients.forEach(async (client) => {
+          try {
+            await setDoc(doc(db, 'clients', client.id), client);
+          } catch (error) {
+            console.error('Error migrating client:', error);
+          }
+        });
+      }
+      
+      if (localTasks.length > 0) {
+        localTasks.forEach(async (task) => {
+          try {
+            await setDoc(doc(db, 'tasks', task.id), task);
+          } catch (error) {
+            console.error('Error migrating task:', error);
+          }
+        });
+      }
+      
+      if (localEvents.length > 0) {
+        localEvents.forEach(async (event) => {
+          try {
+            await setDoc(doc(db, 'events', event.id), event);
+          } catch (error) {
+            console.error('Error migrating event:', error);
+          }
+        });
+      }
+      
       return () => {
         unsubClients();
         unsubTasks();
         unsubEvents();
         unsubDocs();
       };
-      */
     }
   }, [useFirebase]);
   
@@ -163,7 +204,7 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // Add client function - works with both local and Firebase
+  // Add client function
   const addClient = async (clientData) => {
     const newClient = {
       id: uuidv4(),
@@ -175,19 +216,15 @@ export const DataProvider = ({ children }) => {
     };
     
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
-        const docRef = await setDoc(doc(db, 'clients', newClient.id), newClient);
+        await setDoc(doc(db, 'clients', newClient.id), newClient);
         toast.success('Client added and synced');
       } catch (error) {
         console.error('Error adding client to Firebase:', error);
         toast.error('Error syncing - saved locally');
         setClients([...clients, newClient]);
       }
-      */
     } else {
-      // Local mode or offline
       setClients([...clients, newClient]);
       toast.success('Client added successfully');
     }
@@ -213,8 +250,6 @@ export const DataProvider = ({ children }) => {
 
   const updateClient = async (id, updates) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await updateDoc(doc(db, 'clients', id), updates);
         toast.success('Client updated and synced');
@@ -225,7 +260,6 @@ export const DataProvider = ({ children }) => {
           client.id === id ? { ...client, ...updates } : client
         ));
       }
-      */
     } else {
       setClients(clients.map(client => 
         client.id === id ? { ...client, ...updates } : client
@@ -236,8 +270,6 @@ export const DataProvider = ({ children }) => {
 
   const deleteClient = async (id) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await deleteDoc(doc(db, 'clients', id));
         // Also delete related data
@@ -260,7 +292,6 @@ export const DataProvider = ({ children }) => {
         console.error('Error deleting client:', error);
         toast.error('Error syncing - deleted locally');
       }
-      */
     } else {
       setClients(clients.filter(client => client.id !== id));
       setTasks(tasks.filter(task => task.clientId !== id));
@@ -279,15 +310,12 @@ export const DataProvider = ({ children }) => {
     };
     
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await setDoc(doc(db, 'tasks', newTask.id), newTask);
       } catch (error) {
         console.error('Error adding task:', error);
         setTasks([...tasks, newTask]);
       }
-      */
     } else {
       setTasks([...tasks, newTask]);
     }
@@ -297,8 +325,6 @@ export const DataProvider = ({ children }) => {
 
   const updateTask = async (id, updates) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await updateDoc(doc(db, 'tasks', id), updates);
         toast.success('Task updated');
@@ -308,7 +334,6 @@ export const DataProvider = ({ children }) => {
           task.id === id ? { ...task, ...updates } : task
         ));
       }
-      */
     } else {
       setTasks(tasks.map(task => 
         task.id === id ? { ...task, ...updates } : task
@@ -319,8 +344,6 @@ export const DataProvider = ({ children }) => {
 
   const deleteTask = async (id) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await deleteDoc(doc(db, 'tasks', id));
         toast.success('Task deleted');
@@ -328,7 +351,6 @@ export const DataProvider = ({ children }) => {
         console.error('Error deleting task:', error);
         setTasks(tasks.filter(task => task.id !== id));
       }
-      */
     } else {
       setTasks(tasks.filter(task => task.id !== id));
       toast.success('Task deleted');
@@ -348,8 +370,6 @@ export const DataProvider = ({ children }) => {
     };
     
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await setDoc(doc(db, 'events', newEvent.id), newEvent);
         toast.success('Event added to calendar');
@@ -357,7 +377,6 @@ export const DataProvider = ({ children }) => {
         console.error('Error adding event:', error);
         setEvents([...events, newEvent]);
       }
-      */
     } else {
       setEvents([...events, newEvent]);
       toast.success('Event added to calendar');
@@ -368,8 +387,6 @@ export const DataProvider = ({ children }) => {
 
   const updateEvent = async (id, updates) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await updateDoc(doc(db, 'events', id), updates);
         toast.success('Event updated');
@@ -379,7 +396,6 @@ export const DataProvider = ({ children }) => {
           event.id === id ? { ...event, ...updates } : event
         ));
       }
-      */
     } else {
       setEvents(events.map(event => 
         event.id === id ? { ...event, ...updates } : event
@@ -390,8 +406,6 @@ export const DataProvider = ({ children }) => {
 
   const deleteEvent = async (id) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await deleteDoc(doc(db, 'events', id));
         toast.success('Event deleted');
@@ -399,7 +413,6 @@ export const DataProvider = ({ children }) => {
         console.error('Error deleting event:', error);
         setEvents(events.filter(event => event.id !== id));
       }
-      */
     } else {
       setEvents(events.filter(event => event.id !== id));
       toast.success('Event deleted');
@@ -414,8 +427,6 @@ export const DataProvider = ({ children }) => {
     };
     
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await setDoc(doc(db, 'documents', newDoc.id), newDoc);
         toast.success('Document added');
@@ -423,7 +434,6 @@ export const DataProvider = ({ children }) => {
         console.error('Error adding document:', error);
         setDocuments([...documents, newDoc]);
       }
-      */
     } else {
       setDocuments([...documents, newDoc]);
       toast.success('Document added');
@@ -434,8 +444,6 @@ export const DataProvider = ({ children }) => {
 
   const deleteDocument = async (id) => {
     if (useFirebase && isOnline) {
-      // Firebase mode - uncomment when ready
-      /*
       try {
         await deleteDoc(doc(db, 'documents', id));
         toast.success('Document deleted');
@@ -443,7 +451,6 @@ export const DataProvider = ({ children }) => {
         console.error('Error deleting document:', error);
         setDocuments(documents.filter(doc => doc.id !== id));
       }
-      */
     } else {
       setDocuments(documents.filter(doc => doc.id !== id));
       toast.success('Document deleted');
@@ -604,4 +611,3 @@ function getDefaultWorkflows() {
     }
   };
 }
-

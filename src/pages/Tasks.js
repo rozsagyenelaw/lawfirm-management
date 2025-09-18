@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import TimeTracker from '../components/TimeTracker';
 import { CheckCircle, Circle, Calendar, AlertCircle, Plus, X, Clock, Filter, Trash2, Edit, CheckSquare } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format, isPast, isToday, isTomorrow, isThisWeek } from 'date-fns';
@@ -478,3 +479,4 @@ const Tasks = () => {
 };
 
 export default Tasks;
+

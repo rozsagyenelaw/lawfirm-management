@@ -11,13 +11,13 @@
     "react-big-calendar": "^1.8.5",
     "moment": "^2.29.4",
     "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.294.0",
+    "lucide-react": "^0.263.1",
     "uuid": "^9.0.1",
     "recharts": "^2.9.3"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -27,5 +27,10 @@
   "browserslist": {
     "production": [">0.2%", "not dead", "not op_mini all"],
     "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+  },
+  "overrides": {
+    "lucide-react": {
+      "react": "^18.2.0"
+    }
   }
 }

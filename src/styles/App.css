@@ -2104,6 +2104,266 @@ body {
 .quick-action-item-label {
   font-size: 14px;
 }
+/* Time Tracking */
+.time-tracker-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tracker-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.tracker-display {
+  padding: 30px 20px;
+  background: var(--light);
+}
+
+.timer-main {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.timer-digits {
+  font-size: 48px;
+  font-weight: 300;
+  font-family: 'SF Mono', Monaco, monospace;
+  color: var(--primary);
+  margin-bottom: 20px;
+}
+
+.timer-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.timer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.timer-btn.start {
+  background: var(--success);
+  color: white;
+}
+
+.timer-btn.start:hover {
+  background: #059669;
+}
+
+.timer-btn.pause {
+  background: var(--warning);
+  color: white;
+}
+
+.timer-btn.pause:hover {
+  background: #D97706;
+}
+
+.timer-btn.stop {
+  background: var(--danger);
+  color: white;
+}
+
+.timer-btn.stop:hover {
+  background: #DC2626;
+}
+
+.timer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.timer-settings {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 20px;
+  align-items: end;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-group.full-width {
+  grid-column: span 1;
+}
+
+.setting-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.setting-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.rate-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.rate-input input {
+  border: none;
+  outline: none;
+  width: 80px;
+  font-size: 14px;
+}
+
+.setting-group input[type="text"] {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.sessions-list {
+  padding: 20px;
+}
+
+.sessions-list h4 {
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.sessions-table {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.sessions-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sessions-table th {
+  background: var(--light);
+  padding: 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.sessions-table td {
+  padding: 12px 10px;
+  font-size: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.sessions-table tr.non-billable {
+  opacity: 0.7;
+}
+
+.sessions-table tr:hover {
+  background: var(--light);
+}
+
+.sessions-summary {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 20px;
+  background: var(--light);
+  border-radius: 8px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-item span {
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.summary-item strong {
+  font-size: 18px;
+}
+
+.summary-item .amount {
+  color: var(--success);
+}
+
+.tracker-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Add time tracking icon to task cards */
+.task-time-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #EBF5FF;
+  color: var(--primary);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.time-track-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.time-track-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
 /* Time Tracking */
 .time-tracker {
@@ -2342,6 +2602,7 @@ input:checked + .slider:before {
     grid-column: span 1;
   }
 }
+
 
 
 

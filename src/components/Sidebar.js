@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 const Sidebar = ({ collapsed, setCollapsed }) => {
   const menuItems = [
     { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
+    { path: '/daily-digest', icon: '📊', label: 'Daily Digest' },
     { path: '/clients', icon: '👥', label: 'Clients' },
     { path: '/tasks', icon: '✓', label: 'Tasks' },
     { path: '/calendar', icon: '📅', label: 'Calendar' },

@@ -101,6 +101,7 @@ const ClientDetail = () => {
     'probate': 'Probate',
     'trust-litigation': 'Trust Litigation',
     'conservatorship': 'Conservatorship',
+    'guardianship': 'Guardianship',
     'fire-victim': 'Fire Victim'
   };
 

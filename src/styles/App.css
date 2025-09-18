@@ -2564,6 +2564,92 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(26px);
 }
+/* Court Reminders */
+.court-reminders {
+  margin-bottom: 20px;
+}
+
+.reminder-alert {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid;
+  animation: slideInRight 0.3s;
+}
+
+.reminder-alert.high {
+  border-color: var(--warning);
+  background: #FEF3C7;
+}
+
+.reminder-alert.urgent {
+  border-color: var(--danger);
+  background: #FEE2E2;
+}
+
+.reminder-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: white;
+}
+
+.reminder-alert.high .reminder-icon {
+  color: var(--warning);
+}
+
+.reminder-alert.urgent .reminder-icon {
+  color: var(--danger);
+}
+
+.reminder-content {
+  flex: 1;
+}
+
+.reminder-content h4 {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.reminder-content p {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.dismiss-btn {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dismiss-btn:hover {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -2602,6 +2688,7 @@ input:checked + .slider:before {
     grid-column: span 1;
   }
 }
+
 
 
 

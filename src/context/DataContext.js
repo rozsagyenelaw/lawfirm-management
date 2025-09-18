@@ -247,11 +247,13 @@ function getDefaultWorkflows() {
       name: 'Estate Planning',
       tasks: [
         { name: 'Initial Client Consultation', description: 'Meet with client to discuss estate planning needs', daysFromStart: 0 },
-        { name: 'Gather Asset Information', description: 'Collect information about client assets and beneficiaries', daysFromStart: 3 },
-        { name: 'Draft Will/Trust Documents', description: 'Prepare initial drafts of estate planning documents', daysFromStart: 7 },
-        { name: 'Client Review Meeting', description: 'Review draft documents with client', daysFromStart: 14 },
-        { name: 'Finalize Documents', description: 'Make final revisions and prepare for signing', daysFromStart: 21 },
-        { name: 'Signing Ceremony', description: 'Execute documents with witnesses/notary', daysFromStart: 28 }
+        { name: 'Email Digital Copies', description: 'Send digital copies of estate planning documents to client', daysFromStart: 1 },
+        { name: 'Await Client Confirmation', description: 'Wait for client to review and confirm documents', daysFromStart: 3 },
+        { name: 'Follow Up on Documents', description: 'Check if client has questions or needs changes', daysFromStart: 5 },
+        { name: 'Schedule Signing Appointment', description: 'Coordinate signing method (in-office notarization or mail package)', daysFromStart: 6 },
+        { name: 'Notarize Documents OR Mail Package', description: 'Complete notarization in office or send package based on client preference', daysFromStart: 8 },
+        { name: 'Confirm Receipt/Completion', description: 'Ensure client received package or completed in-office signing', daysFromStart: 10 },
+        { name: 'File and Store Documents', description: 'Archive final signed documents', daysFromStart: 12 }
       ]
     },
     'probate': {
@@ -259,9 +261,14 @@ function getDefaultWorkflows() {
       tasks: [
         { name: 'File Petition for Probate', description: 'Submit petition to open probate case', daysFromStart: 0 },
         { name: 'Notice to Heirs', description: 'Send required notices to all heirs and beneficiaries', daysFromStart: 5 },
-        { name: 'Inventory Assets', description: 'Complete inventory of estate assets', daysFromStart: 30 },
+        { name: 'Clear Notes Before Hearing', description: 'Review and prepare all documentation for hearing (7 days before hearing date)', daysFromStart: 23 },
+        { name: 'Attend Probate Hearing', description: 'Appear at probate hearing', daysFromStart: 30 },
+        { name: 'File Order and Letters', description: 'File court order and letters testamentary/administration', daysFromStart: 31 },
+        { name: 'Inventory Assets', description: 'Complete inventory of estate assets', daysFromStart: 45 },
         { name: 'Pay Debts and Taxes', description: 'Settle all estate debts and file tax returns', daysFromStart: 90 },
-        { name: 'Distribute Assets', description: 'Distribute assets to beneficiaries', daysFromStart: 150 }
+        { name: 'Wait Period - 4 Months', description: 'Mandatory 4-month waiting period after letters issued', daysFromStart: 120 },
+        { name: 'File Petition for Distribution', description: 'File petition for final distribution (4 months after letters)', daysFromStart: 151 },
+        { name: 'Distribute Assets', description: 'Distribute assets to beneficiaries per court order', daysFromStart: 180 }
       ]
     },
     'trust-litigation': {
@@ -275,9 +282,32 @@ function getDefaultWorkflows() {
     'conservatorship': {
       name: 'Conservatorship',
       tasks: [
-        { name: 'File Petition', description: 'File petition for conservatorship', daysFromStart: 0 },
-        { name: 'Court Investigation', description: 'Coordinate with court investigator', daysFromStart: 15 },
-        { name: 'Court Hearing', description: 'Attend conservatorship hearing', daysFromStart: 30 }
+        { name: 'Case Evaluation', description: 'Evaluate merits and requirements for conservatorship', daysFromStart: 0 },
+        { name: 'File Petition', description: 'File petition for conservatorship with court', daysFromStart: 2 },
+        { name: 'File Capacity Declaration', description: 'Submit medical/capacity declaration from qualified professional', daysFromStart: 3 },
+        { name: 'File Citation', description: 'File and serve citation to proposed conservatee', daysFromStart: 5 },
+        { name: 'Court Investigation', description: 'Coordinate with court investigator for required investigation', daysFromStart: 15 },
+        { name: 'Court Hearing', description: 'Attend conservatorship hearing', daysFromStart: 30 },
+        { name: 'File Order and Letters', description: 'File order appointing conservator and letters of conservatorship', daysFromStart: 31 },
+        { name: 'Initial Inventory', description: 'Complete initial inventory of conservatee assets (if estate)', daysFromStart: 60 },
+        { name: 'First Annual Accounting', description: 'Prepare and file first annual accounting', daysFromStart: 365 },
+        { name: 'Second Annual Accounting', description: 'Prepare and file second annual accounting', daysFromStart: 730 },
+        { name: 'Biennial Review Hearing', description: 'Court review hearing (every 2 years)', daysFromStart: 730 }
+      ]
+    },
+    'guardianship': {
+      name: 'Guardianship',
+      tasks: [
+        { name: 'Case Evaluation', description: 'Evaluate need for guardianship of minor', daysFromStart: 0 },
+        { name: 'File Petition', description: 'File petition for guardianship with court', daysFromStart: 2 },
+        { name: 'File Consent Forms', description: 'File parental consent forms if applicable', daysFromStart: 3 },
+        { name: 'File Citation', description: 'File and serve citation to interested parties', daysFromStart: 5 },
+        { name: 'Court Investigation', description: 'Coordinate with court investigator for home study', daysFromStart: 15 },
+        { name: 'Court Hearing', description: 'Attend guardianship hearing', daysFromStart: 30 },
+        { name: 'File Order and Letters', description: 'File order appointing guardian and letters of guardianship', daysFromStart: 31 },
+        { name: 'Initial Status Report', description: 'File initial status report with court', daysFromStart: 90 },
+        { name: 'First Annual Review', description: 'Prepare and file first annual status report', daysFromStart: 365 },
+        { name: 'Second Annual Review', description: 'Prepare and file second annual status report', daysFromStart: 730 }
       ]
     },
     'fire-victim': {

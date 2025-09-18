@@ -552,6 +552,7 @@ body {
 .category-badge.probate { background: #D1FAE5; color: #10B981; }
 .category-badge.trust-litigation { background: #FEF3C7; color: #F59E0B; }
 .category-badge.conservatorship { background: #F3E8FF; color: #8B5CF6; }
+.category-badge.guardianship { background: #DBEAFE; color: #1E40AF; }
 .category-badge.fire-victim { background: #FEE2E2; color: #EF4444; }
 
 /* Modal */
@@ -689,6 +690,13 @@ body {
   margin-bottom: 10px;
 }
 
+.document-notes {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 8px;
+  font-style: italic;
+}
+
 .document-actions {
   display: flex;
   justify-content: flex-end;
@@ -696,6 +704,20 @@ body {
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid var(--border);
+}
+
+.document-card .document-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.document-card .btn-icon {
+  transition: all 0.2s;
+}
+
+.document-card .btn-icon:hover {
+  transform: scale(1.1);
+  background: var(--light);
 }
 
 .upload-area {

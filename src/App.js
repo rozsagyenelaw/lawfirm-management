@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
+import DailyDigest from './pages/DailyDigest';
 import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import Tasks from './pages/Tasks';
@@ -34,6 +35,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/daily-digest" element={<DailyDigest />} />
               <Route path="/clients" element={<Clients />} />
               <Route path="/clients/:id" element={<ClientDetail />} />
               <Route path="/tasks" element={<Tasks />} />

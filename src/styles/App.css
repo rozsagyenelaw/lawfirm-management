@@ -3016,6 +3016,107 @@ input:checked + .slider:before {
     grid-template-columns: 1fr;
   }
 }
+/* Task Dependencies */
+.blocked-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: #FEF3C7;
+  color: #92400E;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.kanban-task-card.blocked {
+  background: #F9FAFB;
+}
+
+.task-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.dependency-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: #DBEAFE;
+  color: #1E40AF;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.dependency-modal {
+  max-width: 600px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.dependency-content {
+  padding: 20px;
+}
+
+.modal-subtitle {
+  color: var(--text-light);
+  margin: 10px 0;
+}
+
+.dependency-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.dependency-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: var(--light);
+  border-radius: 6px;
+}
+
+.dependency-item strong {
+  margin-right: 10px;
+}
+
+.no-dependencies {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-light);
+  background: var(--light);
+  border-radius: 6px;
+}
+
+.available-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.available-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.available-task:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
 
 
 

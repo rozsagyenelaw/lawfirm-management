@@ -24,6 +24,7 @@ const Clients = () => {
     { value: 'probate', label: 'Probate' },
     { value: 'trust-litigation', label: 'Trust Litigation' },
     { value: 'conservatorship', label: 'Conservatorship' },
+    { value: 'guardianship', label: 'Guardianship' },
     { value: 'fire-victim', label: 'Fire Victim' }
   ];
 

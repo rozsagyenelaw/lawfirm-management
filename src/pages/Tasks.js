@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle, Circle, Calendar, AlertCircle, Plus, X, Clock, Filter, Trash2, Edit, CheckSquare } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format, isPast, isToday, isTomorrow, isThisWeek } from 'date-fns';
+import AdvancedFilters from '../components/AdvancedFilters';
 
 const Tasks = () => {
   const { tasks, clients, completeTask, deleteTask, updateTask, addTask } = useData();
@@ -13,6 +14,7 @@ const Tasks = () => {
   const [filterClient, setFilterClient] = useState('all');
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [selectMode, setSelectMode] = useState(false);
+  const [filteredByAdvanced, setFilteredByAdvanced] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -31,29 +33,33 @@ const Tasks = () => {
     { value: 'fire-victim', label: 'Fire Victim' }
   ];
 
-  // Filter tasks
-  let filteredTasks = tasks;
-  if (filterCategory !== 'all') {
-    filteredTasks = filteredTasks.filter(task => task.category === filterCategory);
-  }
-  if (filterStatus !== 'all') {
-    if (filterStatus === 'completed') {
-      filteredTasks = filteredTasks.filter(task => task.completed);
-    } else if (filterStatus === 'pending') {
-      filteredTasks = filteredTasks.filter(task => !task.completed);
-    } else if (filterStatus === 'overdue') {
-      filteredTasks = filteredTasks.filter(task => !task.completed && isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)));
+  // Use advanced filters if active, otherwise use regular filters
+  let displayTasks = filteredByAdvanced || tasks;
+  
+  // Apply regular filters only if advanced filters are not active
+  if (!filteredByAdvanced) {
+    if (filterCategory !== 'all') {
+      displayTasks = displayTasks.filter(task => task.category === filterCategory);
     }
-  }
-  if (filterClient !== 'all') {
-    filteredTasks = filteredTasks.filter(task => task.clientId === filterClient);
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'completed') {
+        displayTasks = displayTasks.filter(task => task.completed);
+      } else if (filterStatus === 'pending') {
+        displayTasks = displayTasks.filter(task => !task.completed);
+      } else if (filterStatus === 'overdue') {
+        displayTasks = displayTasks.filter(task => !task.completed && isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)));
+      }
+    }
+    if (filterClient !== 'all') {
+      displayTasks = displayTasks.filter(task => task.clientId === filterClient);
+    }
   }
 
   // Categorize tasks
-  const overdueTasks = filteredTasks.filter(task => !task.completed && isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)));
-  const todayTasks = filteredTasks.filter(task => !task.completed && isToday(new Date(task.dueDate)));
-  const upcomingTasks = filteredTasks.filter(task => !task.completed && !isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)));
-  const completedTasks = filteredTasks.filter(task => task.completed);
+  const overdueTasks = displayTasks.filter(task => !task.completed && isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)));
+  const todayTasks = displayTasks.filter(task => !task.completed && isToday(new Date(task.dueDate)));
+  const upcomingTasks = displayTasks.filter(task => !task.completed && !isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)));
+  const completedTasks = displayTasks.filter(task => task.completed);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -284,6 +290,14 @@ const Tasks = () => {
         </div>
       </div>
 
+      {/* Advanced Filters */}
+      <AdvancedFilters
+        items={tasks}
+        onFilterChange={setFilteredByAdvanced}
+        filterableFields={['status', 'priority', 'category', 'dateRange']}
+        entityType="tasks"
+      />
+
       {/* Batch Actions Bar */}
       {selectMode && selectedTasks.length > 0 && (
         <div className="batch-actions-bar">
@@ -310,34 +324,36 @@ const Tasks = () => {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="filters-bar">
-        <div className="filter-group">
-          <Filter size={20} />
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="overdue">Overdue</option>
-          </select>
+      {/* Regular Filters - Only show if advanced filters are not active */}
+      {!filteredByAdvanced && (
+        <div className="filters-bar">
+          <div className="filter-group">
+            <Filter size={20} />
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+          <div className="filter-group">
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
+              <option value="all">All Clients</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="filter-group">
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-            <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat.value} value={cat.value}>{cat.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="filter-group">
-          <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
-            <option value="all">All Clients</option>
-            {clients.map(client => (
-              <option key={client.id} value={client.id}>{client.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
       <div className="tasks-container">
         {renderTaskGroup('Overdue', overdueTasks, 'text-red')}
@@ -345,7 +361,7 @@ const Tasks = () => {
         {renderTaskGroup('Upcoming', upcomingTasks)}
         {renderTaskGroup('Completed', completedTasks, 'text-gray')}
         
-        {filteredTasks.length === 0 && (
+        {displayTasks.length === 0 && (
           <div className="empty-state">
             <CheckCircle size={48} />
             <p>No tasks found</p>

@@ -1,0 +1,119 @@
+Script started on Thu Sep 18 09:07:45 2025
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+[?1034hbash-3.2$ 
+bash-3.2$ cd ~/lawfirm-management
+bash-3.2$ 
+bash-3.2$ # Create all the empty files with proper structure
+bash-3.2$ touch src/App.js
+bash-3.2$ touch src/index.js
+bash-3.2$ touch src/components/Sidebar.js
+bash-3.2$ touch src/context/DataContext.js
+bash-3.2$ touch src/pages/Dashboard.js
+bash-3.2$ touch src/pages/Clients.js
+bash-3.2$ touch src/pages/ClientDetail.js
+bash-3.2$ touch src/pages/Tasks.js
+bash-3.2$ touch src/pages/Calendar.js
+bash-3.2$ touch src/pages/Documents.js
+bash-3.2$ touch src/pages/Settings.js
+bash-3.2$ touch src/styles/App.css
+bash-3.2$ 
+bash-3.2$ # Create config files
+bash-3.2$ touch .gitignore
+bash-3.2$ touch netlify.toml
+bash-3.2$ touch README.md
+bash-3.2$ echo "node_modules
+> .DS_Store
+> build
+> *.log" > .gitignore
+bash-3.2$ echo "node_modules
+> .DS_Store
+> build
+> *.log" > .gitignore
+bash-3.2$ git commit -m "Add all file structure for law firm management app"
+On branch main
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	[31mmodified:   .gitignore[m
+	[31mmodified:   package-lock.json[m
+	[31mmodified:   package.json[m
+	[31mdeleted:    src/App.css[m
+	[31mmodified:   src/App.js[m
+	[31mdeleted:    src/App.test.js[m
+	[31mdeleted:    src/index.css[m
+	[31mmodified:   src/index.js[m
+	[31mdeleted:    src/logo.svg[m
+	[31mdeleted:    src/reportWebVitals.js[m
+	[31mdeleted:    src/setupTests.js[m
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	[31mnetlify.toml[m
+	[31msrc/components/[m
+	[31msrc/context/[m
+	[31msrc/pages/[m
+	[31msrc/styles/[m
+	[31mtypescript[m
+
+no changes added to commit (use "git add" and/or "git commit -a")
+bash-3.2$ # First, add all the new files and directories
+bash-3.2$ git add src/components/
+bash-3.2$ git add src/context/
+bash-3.2$ git add src/pages/
+bash-3.2$ git add src/styles/
+bash-3.2$ git add netlify.toml
+bash-3.2$ git add README.md
+bash-3.2$ 
+bash-3.2$ # Now commit everything
+bash-3.2$ git commit -m "Add law firm app structure and remove default React fil es"
+[main 443f4b1] Add law firm app structure and remove default React files
+ 11 files changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 netlify.toml
+ create mode 100644 src/components/Sidebar.js
+ create mode 100644 src/context/DataContext.js
+ create mode 100644 src/pages/Calendar.js
+ create mode 100644 src/pages/ClientDetail.js
+ create mode 100644 src/pages/Clients.js
+ create mode 100644 src/pages/Dashboard.js
+ create mode 100644 src/pages/Documents.js
+ create mode 100644 src/pages/Settings.js
+ create mode 100644 src/pages/Tasks.js
+ create mode 100644 src/styles/App.css
+bash-3.2$ 
+bash-3.2$ # Push to GitHub
+bash-3.2$ git push origin main
+Enumerating objects: 30, done.
+Counting objects:   3% (1/30)Counting objects:   6% (2/30)Counting objects:  10% (3/30)Counting objects:  13% (4/30)Counting objects:  16% (5/30)Counting objects:  20% (6/30)Counting objects:  23% (7/30)Counting objects:  26% (8/30)Counting objects:  30% (9/30)Counting objects:  33% (10/30)Counting objects:  36% (11/30)Counting objects:  40% (12/30)Counting objects:  43% (13/30)Counting objects:  46% (14/30)Counting objects:  50% (15/30)Counting objects:  53% (16/30)Counting objects:  56% (17/30)Counting objects:  60% (18/30)Counting objects:  63% (19/30)Counting objects:  66% (20/30)Counting objects:  70% (21/30)Counting objects:  73% (22/30)Counting objects:  76% (23/30)Counting objects:  80% (24/30)Counting objects:  83% (25/30)Counting objects:  86% (26/30)Counting objects:  90% (27/30)Counting objects:  93% (28/30)Counting objects:  96% (29/30)Counting objects: 100% (30/30)Counting objects: 100% (30/30), done.
+Delta compression using up to 12 threads
+Compressing objects:   3% (1/26)Compressing objects:   7% (2/26)Compressing objects:  11% (3/26)Compressing objects:  15% (4/26)Compressing objects:  19% (5/26)Compressing objects:  23% (6/26)Compressing objects:  26% (7/26)Compressing objects:  30% (8/26)Compressing objects:  34% (9/26)Compressing objects:  38% (10/26)Compressing objects:  42% (11/26)Compressing objects:  46% (12/26)Compressing objects:  50% (13/26)Compressing objects:  53% (14/26)Compressing objects:  57% (15/26)Compressing objects:  61% (16/26)Compressing objects:  65% (17/26)Compressing objects:  69% (18/26)Compressing objects:  73% (19/26)Compressing objects:  76% (20/26)Compressing objects:  80% (21/26)Compressing objects:  84% (22/26)Compressing objects:  88% (23/26)Compressing objects:  92% (24/26)Compressing objects:  96% (25/26)Compressing objects: 100% (26/26)Compressing objects: 100% (26/26), done.
+Writing objects:   3% (1/30)Writing objects:   6% (2/30)Writing objects:  10% (3/30)Writing objects:  13% (4/30)Writing objects:  16% (5/30)Writing objects:  20% (6/30)Writing objects:  23% (7/30)Writing objects:  26% (8/30)Writing objects:  30% (9/30)Writing objects:  33% (10/30)Writing objects:  36% (11/30)Writing objects:  40% (12/30)Writing objects:  43% (13/30)Writing objects:  46% (14/30)Writing objects:  50% (15/30)Writing objects:  53% (16/30)Writing objects:  56% (17/30)Writing objects:  60% (18/30)Writing objects:  63% (19/30)Writing objects:  66% (20/30)Writing objects:  70% (21/30)Writing objects:  73% (22/30)Writing objects:  76% (23/30)Writing objects:  80% (24/30)Writing objects:  83% (25/30)Writing objects:  86% (26/30)Writing objects:  90% (27/30)Writing objects:  93% (28/30)Writing objects:  96% (29/30)Writing objects: 100% (30/30)Writing objects: 100% (30/30), 175.93 KiB | 12.57 MiB/s, done.
+Total 30 (delta 2), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas:   0% (0/2)[Kremote: Resolving deltas:  50% (1/2)[Kremote: Resolving deltas: 100% (2/2)[Kremote: Resolving deltas: 100% (2/2), done.[K
+To https://github.com/rozsagyenelaw/lawfirm-management.git
+ * [new branch]      main -> main
+bash-3.2$ git status
+On branch main
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	[31mmodified:   .gitignore[m
+	[31mmodified:   package-lock.json[m
+	[31mmodified:   package.json[m
+	[31mdeleted:    src/App.css[m
+	[31mmodified:   src/App.js[m
+	[31mdeleted:    src/App.test.js[m
+	[31mdeleted:    src/index.css[m
+	[31mmodified:   src/index.js[m
+	[31mdeleted:    src/logo.svg[m
+	[31mdeleted:    src/reportWebVitals.js[m
+	[31mdeleted:    src/setupTests.js[m
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	[31mtypescript[m
+
+no changes added to commit (use "git add" and/or "git commit -a")
+bash-3.2$ 

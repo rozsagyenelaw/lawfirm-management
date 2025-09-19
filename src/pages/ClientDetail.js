@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import DocumentUpload from '../components/DocumentUpload';
 import InvoiceGenerator from '../components/InvoiceGenerator';
 import PaymentManager from '../components/PaymentManager';
+import FormsTracker from '../components/FormsTracker';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -216,6 +217,16 @@ const ClientDetail = () => {
           >
             Payments
           </button>
+          {(client.category === 'probate' || 
+            client.category === 'conservatorship' || 
+            client.category === 'guardianship') && (
+            <button 
+              className={`tab ${activeTab === 'forms' ? 'active' : ''}`}
+              onClick={() => setActiveTab('forms')}
+            >
+              Forms
+            </button>
+          )}
         </div>
 
         <div className="tab-content">
@@ -390,6 +401,26 @@ const ClientDetail = () => {
           {activeTab === 'payments' && (
             <div className="section-content">
               <PaymentManager clientId={id} clientName={client.name} />
+            </div>
+          )}
+
+          {activeTab === 'forms' && (
+            <div className="section-content">
+              {(client.category === 'probate' || 
+                client.category === 'conservatorship' || 
+                client.category === 'guardianship') ? (
+                <FormsTracker 
+                  clientId={id} 
+                  clientName={client.name}
+                  category={client.category}
+                  caseStartDate={client.createdAt}
+                />
+              ) : (
+                <div className="empty-state">
+                  <FileText size={48} />
+                  <p>Forms tracking is not available for {categories[client.category]}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

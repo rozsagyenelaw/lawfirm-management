@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import DocumentUpload from '../components/DocumentUpload';
 import InvoiceGenerator from '../components/InvoiceGenerator';
+import PaymentManager from '../components/PaymentManager';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -17,6 +18,7 @@ const ClientDetail = () => {
     getClientDocuments,
     getClientEvents,
     getClientInvoices,
+    getClientTrustBalance,
     addTask,
     addDocument,
     addEvent
@@ -45,6 +47,7 @@ const ClientDetail = () => {
   const clientDocuments = getClientDocuments(id);
   const clientEvents = getClientEvents(id);
   const clientInvoices = getClientInvoices(id);
+  const trustBalance = getClientTrustBalance(id);
 
   const handleUpdate = () => {
     updateClient(id, editData);
@@ -207,6 +210,12 @@ const ClientDetail = () => {
           >
             Invoice ({clientInvoices.length})
           </button>
+          <button 
+            className={`tab ${activeTab === 'payments' ? 'active' : ''}`}
+            onClick={() => setActiveTab('payments')}
+          >
+            Payments
+          </button>
         </div>
 
         <div className="tab-content">
@@ -294,6 +303,10 @@ const ClientDetail = () => {
                     <DollarSign size={18} />
                     <span>{clientInvoices.length} invoices</span>
                   </div>
+                  <div className="stat-item">
+                    <CreditCard size={18} />
+                    <span>${trustBalance.toFixed(2)} in trust</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -371,6 +384,12 @@ const ClientDetail = () => {
           {activeTab === 'invoice' && (
             <div className="section-content">
               <InvoiceGenerator clientId={id} clientName={client.name} />
+            </div>
+          )}
+
+          {activeTab === 'payments' && (
+            <div className="section-content">
+              <PaymentManager clientId={id} clientName={client.name} />
             </div>
           )}
         </div>

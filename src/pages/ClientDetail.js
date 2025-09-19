@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
+import DocumentUpload from '../components/DocumentUpload';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -321,28 +322,7 @@ const ClientDetail = () => {
 
           {activeTab === 'documents' && (
             <div className="section-content">
-              <div className="section-header">
-                <h3>Documents</h3>
-                <button className="btn-primary" onClick={handleAddDocument}>
-                  <Plus size={20} />
-                  Add Document
-                </button>
-              </div>
-              {clientDocuments.length > 0 ? (
-                <div className="document-list">
-                  {clientDocuments.map(doc => (
-                    <div key={doc.id} className="document-item">
-                      <FileText size={20} />
-                      <div className="document-info">
-                        <h4>{doc.name}</h4>
-                        <p>Uploaded {format(new Date(doc.uploadedAt), 'MMM dd, yyyy')}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-state">No documents for this client</p>
-              )}
+              <DocumentUpload clientId={id} clientName={client.name} />
             </div>
           )}
 

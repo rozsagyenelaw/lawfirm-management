@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
-import { DollarSign, Download, FileText, Clock, Calculator, Edit2, Plus, X } from 'lucide-react';
+import { DollarSign, Download, FileText, Clock, Calculator, Edit2, Plus, X, Percent, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { useData } from '../context/DataContext';
 import toast from 'react-hot-toast';
 
 const InvoiceGenerator = ({ clientId, clientName }) => {
-  const { addInvoice, getClientTasks, tasks, updateTask } = useData();
+  const { addInvoice, getClientTasks, invoices, tasks, updateTask } = useData();
+  const [activeView, setActiveView] = useState('generate'); // 'generate' or 'history'
   const [invoiceData, setInvoiceData] = useState({
     invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
     hourlyRate: 350,
     invoiceDate: format(new Date(), 'yyyy-MM-dd'),
-    dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), // Changed to 15 days
+    dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     lineItems: [],
     notes: '',
-    paymentTerms: 'Net 15' // Changed to Net 15
+    paymentTerms: 'Net 15',
+    discount: 0,
+    discountType: 'percent' // 'percent' or 'fixed'
   });
   
   const [showAddItem, setShowAddItem] = useState(false);
@@ -25,6 +28,17 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
   });
   
   const [editingItem, setEditingItem] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [paymentData, setPaymentData] = useState({
+    amount: 0,
+    date: format(new Date(), 'yyyy-MM-dd'),
+    method: 'check',
+    referenceNumber: ''
+  });
+  
+  // Get client invoices
+  const clientInvoices = invoices.filter(inv => inv.clientId === clientId);
   
   // Get tasks with time tracking for this client
   const clientTasks = getClientTasks(clientId);
@@ -124,12 +138,66 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
     }));
   };
 
-  const calculateTotal = () => {
+  const calculateSubtotal = () => {
     return invoiceData.lineItems.reduce((sum, item) => sum + item.amount, 0);
+  };
+
+  const calculateDiscount = () => {
+    const subtotal = calculateSubtotal();
+    if (invoiceData.discountType === 'percent') {
+      return subtotal * (invoiceData.discount / 100);
+    }
+    return parseFloat(invoiceData.discount) || 0;
+  };
+
+  const calculateTotal = () => {
+    return calculateSubtotal() - calculateDiscount();
   };
 
   const calculateTotalHours = () => {
     return invoiceData.lineItems.reduce((sum, item) => sum + parseFloat(item.hours), 0);
+  };
+
+  const recordPayment = () => {
+    if (!selectedInvoice) return;
+    
+    // Update invoice in localStorage
+    const storedInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+    const updatedInvoices = storedInvoices.map(inv => {
+      if (inv.invoiceNumber === selectedInvoice.invoiceNumber) {
+        const payment = {
+          amount: parseFloat(paymentData.amount),
+          date: paymentData.date,
+          method: paymentData.method,
+          referenceNumber: paymentData.referenceNumber
+        };
+        
+        const payments = inv.payments || [];
+        payments.push(payment);
+        
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        const status = totalPaid >= inv.amount ? 'paid' : 'partial';
+        
+        return {
+          ...inv,
+          payments,
+          totalPaid,
+          status,
+          balance: inv.amount - totalPaid
+        };
+      }
+      return inv;
+    });
+    
+    localStorage.setItem('invoices', JSON.stringify(updatedInvoices));
+    toast.success('Payment recorded successfully!');
+    setShowPaymentModal(false);
+    setPaymentData({
+      amount: 0,
+      date: format(new Date(), 'yyyy-MM-dd'),
+      method: 'check',
+      referenceNumber: ''
+    });
   };
 
   const generatePDF = () => {
@@ -205,17 +273,29 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
       yPosition += lines.length * 5 + 5;
     });
     
-    // Total section
+    // Subtotal, Discount, Total section
     yPosition += 5;
     doc.line(120, yPosition, 190, yPosition);
     yPosition += 7;
     
-    doc.setFont(undefined, 'bold');
-    doc.text('Total Hours:', 120, yPosition, { align: 'right' });
-    doc.text(calculateTotalHours().toFixed(2), 185, yPosition, { align: 'right' });
-    
+    // Subtotal
+    doc.text('Subtotal:', 120, yPosition, { align: 'right' });
+    doc.text(`$${calculateSubtotal().toFixed(2)}`, 185, yPosition, { align: 'right' });
     yPosition += 7;
+    
+    // Discount if applicable
+    if (invoiceData.discount > 0) {
+      const discountText = invoiceData.discountType === 'percent' 
+        ? `Discount (${invoiceData.discount}%):` 
+        : 'Discount:';
+      doc.text(discountText, 120, yPosition, { align: 'right' });
+      doc.text(`-$${calculateDiscount().toFixed(2)}`, 185, yPosition, { align: 'right' });
+      yPosition += 7;
+    }
+    
+    // Total
     doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
     doc.text('Total Amount:', 120, yPosition, { align: 'right' });
     doc.text(`$${calculateTotal().toFixed(2)}`, 185, yPosition, { align: 'right' });
     
@@ -271,11 +351,16 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
       clientName,
       invoiceNumber: invoiceData.invoiceNumber,
       amount: calculateTotal(),
+      subtotal: calculateSubtotal(),
+      discount: calculateDiscount(),
       hours: calculateTotalHours(),
       status: 'sent',
       items: invoiceData.lineItems,
       invoiceDate: invoiceData.invoiceDate,
-      dueDate: invoiceData.dueDate
+      dueDate: invoiceData.dueDate,
+      payments: [],
+      totalPaid: 0,
+      balance: calculateTotal()
     });
     
     toast.success('Invoice generated successfully!');
@@ -283,152 +368,326 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
 
   return (
     <div className="invoice-generator">
-      <div className="invoice-header">
-        <h3>Generate Invoice</h3>
-        <div className="invoice-meta">
-          <div className="invoice-field">
-            <label>Invoice #</label>
-            <input
-              type="text"
-              value={invoiceData.invoiceNumber}
-              onChange={(e) => setInvoiceData({...invoiceData, invoiceNumber: e.target.value})}
-            />
-          </div>
-          <div className="invoice-field">
-            <label>Invoice Date</label>
-            <input
-              type="date"
-              value={invoiceData.invoiceDate}
-              onChange={(e) => setInvoiceData({...invoiceData, invoiceDate: e.target.value})}
-            />
-          </div>
-          <div className="invoice-field">
-            <label>Due Date (Net 15)</label>
-            <input
-              type="date"
-              value={invoiceData.dueDate}
-              onChange={(e) => setInvoiceData({...invoiceData, dueDate: e.target.value})}
-            />
-          </div>
-        </div>
+      <div className="invoice-tabs">
+        <button 
+          className={`tab ${activeView === 'generate' ? 'active' : ''}`}
+          onClick={() => setActiveView('generate')}
+        >
+          Generate Invoice
+        </button>
+        <button 
+          className={`tab ${activeView === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveView('history')}
+        >
+          Invoice History ({clientInvoices.length})
+        </button>
       </div>
-      
-      <div className="invoice-items">
-        <div className="items-header">
-          <h4>Invoice Items</h4>
-          <button 
-            className="btn-secondary"
-            onClick={() => setShowAddItem(true)}
-          >
-            <Plus size={16} />
-            Add Custom Item
-          </button>
-        </div>
-        
-        {showAddItem && (
-          <div className="add-item-form">
-            <input
-              type="text"
-              placeholder="Description of services..."
-              value={newItem.description}
-              onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-            />
-            <input
-              type="number"
-              placeholder="Hours"
-              value={newItem.hours}
-              onChange={(e) => setNewItem({...newItem, hours: e.target.value})}
-              step="0.1"
-            />
-            <input
-              type="number"
-              placeholder="Rate"
-              value={newItem.rate}
-              onChange={(e) => setNewItem({...newItem, rate: e.target.value})}
-            />
-            <button className="btn-primary" onClick={addLineItem}>Add</button>
-            <button className="btn-text" onClick={() => setShowAddItem(false)}>Cancel</button>
-          </div>
-        )}
-        
-        <div className="line-items">
-          {invoiceData.lineItems.map(item => (
-            <div key={item.id} className="line-item">
-              <div className="item-description">
-                {editingItem === item.id ? (
-                  <input
-                    type="text"
-                    value={item.description}
-                    onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
-                    onBlur={() => setEditingItem(null)}
-                    autoFocus
-                  />
-                ) : (
-                  <div onClick={() => setEditingItem(item.id)}>
-                    <span>{item.description}</span>
-                    <Edit2 size={14} className="edit-icon" />
-                  </div>
-                )}
+
+      {activeView === 'generate' ? (
+        <>
+          <div className="invoice-header">
+            <h3>Generate Invoice</h3>
+            <div className="invoice-meta">
+              <div className="invoice-field">
+                <label>Invoice #</label>
+                <input
+                  type="text"
+                  value={invoiceData.invoiceNumber}
+                  onChange={(e) => setInvoiceData({...invoiceData, invoiceNumber: e.target.value})}
+                />
               </div>
-              <div className="item-details">
+              <div className="invoice-field">
+                <label>Invoice Date</label>
                 <input
-                  type="number"
-                  value={item.hours}
-                  onChange={(e) => updateLineItem(item.id, 'hours', e.target.value)}
-                  step="0.1"
-                  className="hours-input"
+                  type="date"
+                  value={invoiceData.invoiceDate}
+                  onChange={(e) => setInvoiceData({...invoiceData, invoiceDate: e.target.value})}
                 />
-                <span>hrs × </span>
+              </div>
+              <div className="invoice-field">
+                <label>Due Date (Net 15)</label>
                 <input
-                  type="number"
-                  value={item.rate}
-                  onChange={(e) => updateLineItem(item.id, 'rate', e.target.value)}
-                  className="rate-input"
+                  type="date"
+                  value={invoiceData.dueDate}
+                  onChange={(e) => setInvoiceData({...invoiceData, dueDate: e.target.value})}
                 />
-                <span className="item-amount">${item.amount.toFixed(2)}</span>
-                <button 
-                  className="btn-icon"
-                  onClick={() => removeLineItem(item.id)}
-                >
-                  <X size={16} />
-                </button>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-      
-      <div className="invoice-footer">
-        <div className="invoice-notes">
-          <label>Notes (Optional)</label>
-          <textarea
-            value={invoiceData.notes}
-            onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
-            placeholder="Additional notes or special instructions..."
-            rows="3"
-          />
-        </div>
-        
-        <div className="invoice-summary">
-          <div className="summary-row">
-            <span>Total Hours:</span>
-            <strong>{calculateTotalHours().toFixed(2)}</strong>
-          </div>
-          <div className="summary-row total">
-            <span>Total Amount:</span>
-            <strong>${calculateTotal().toFixed(2)}</strong>
           </div>
           
-          <button 
-            className="btn-primary"
-            onClick={generatePDF}
-            disabled={invoiceData.lineItems.length === 0}
-          >
-            <Download size={18} />
-            Generate Invoice PDF
-          </button>
+          <div className="invoice-items">
+            <div className="items-header">
+              <h4>Invoice Items</h4>
+              <button 
+                className="btn-secondary"
+                onClick={() => setShowAddItem(true)}
+              >
+                <Plus size={16} />
+                Add Custom Item
+              </button>
+            </div>
+            
+            {showAddItem && (
+              <div className="add-item-form">
+                <input
+                  type="text"
+                  placeholder="Description of services..."
+                  value={newItem.description}
+                  onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                />
+                <input
+                  type="number"
+                  placeholder="Hours"
+                  value={newItem.hours}
+                  onChange={(e) => setNewItem({...newItem, hours: e.target.value})}
+                  step="0.1"
+                />
+                <input
+                  type="number"
+                  placeholder="Rate"
+                  value={newItem.rate}
+                  onChange={(e) => setNewItem({...newItem, rate: e.target.value})}
+                />
+                <button className="btn-primary" onClick={addLineItem}>Add</button>
+                <button className="btn-text" onClick={() => setShowAddItem(false)}>Cancel</button>
+              </div>
+            )}
+            
+            <div className="line-items">
+              {invoiceData.lineItems.map(item => (
+                <div key={item.id} className="line-item">
+                  <div className="item-description">
+                    {editingItem === item.id ? (
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
+                        onBlur={() => setEditingItem(null)}
+                        autoFocus
+                      />
+                    ) : (
+                      <div onClick={() => setEditingItem(item.id)}>
+                        <span>{item.description}</span>
+                        <Edit2 size={14} className="edit-icon" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="item-details">
+                    <input
+                      type="number"
+                      value={item.hours}
+                      onChange={(e) => updateLineItem(item.id, 'hours', e.target.value)}
+                      step="0.1"
+                      className="hours-input"
+                    />
+                    <span>hrs × </span>
+                    <input
+                      type="number"
+                      value={item.rate}
+                      onChange={(e) => updateLineItem(item.id, 'rate', e.target.value)}
+                      className="rate-input"
+                    />
+                    <span className="item-amount">${item.amount.toFixed(2)}</span>
+                    <button 
+                      className="btn-icon"
+                      onClick={() => removeLineItem(item.id)}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="invoice-footer">
+            <div className="invoice-notes">
+              <label>Notes (Optional)</label>
+              <textarea
+                value={invoiceData.notes}
+                onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
+                placeholder="Additional notes or special instructions..."
+                rows="3"
+              />
+            </div>
+            
+            <div className="invoice-summary">
+              <div className="discount-section">
+                <label>
+                  <Percent size={16} />
+                  Discount
+                </label>
+                <div className="discount-inputs">
+                  <input
+                    type="number"
+                    value={invoiceData.discount}
+                    onChange={(e) => setInvoiceData({...invoiceData, discount: e.target.value})}
+                    placeholder="0"
+                    className="discount-input"
+                  />
+                  <select
+                    value={invoiceData.discountType}
+                    onChange={(e) => setInvoiceData({...invoiceData, discountType: e.target.value})}
+                    className="discount-type"
+                  >
+                    <option value="percent">%</option>
+                    <option value="fixed">$</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="summary-row">
+                <span>Total Hours:</span>
+                <strong>{calculateTotalHours().toFixed(2)}</strong>
+              </div>
+              <div className="summary-row">
+                <span>Subtotal:</span>
+                <strong>${calculateSubtotal().toFixed(2)}</strong>
+              </div>
+              {invoiceData.discount > 0 && (
+                <div className="summary-row discount">
+                  <span>Discount:</span>
+                  <strong>-${calculateDiscount().toFixed(2)}</strong>
+                </div>
+              )}
+              <div className="summary-row total">
+                <span>Total Amount:</span>
+                <strong>${calculateTotal().toFixed(2)}</strong>
+              </div>
+              
+              <button 
+                className="btn-primary"
+                onClick={generatePDF}
+                disabled={invoiceData.lineItems.length === 0}
+              >
+                <Download size={18} />
+                Generate Invoice PDF
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="invoice-history">
+          <h3>Invoice History</h3>
+          {clientInvoices.length > 0 ? (
+            <div className="invoice-list">
+              {clientInvoices.map(invoice => (
+                <div key={invoice.invoiceNumber} className="invoice-history-item">
+                  <div className="invoice-info">
+                    <h4>{invoice.invoiceNumber}</h4>
+                    <span className="invoice-date">
+                      {format(new Date(invoice.invoiceDate), 'MMM dd, yyyy')}
+                    </span>
+                  </div>
+                  <div className="invoice-status">
+                    <span className={`status-badge ${invoice.status}`}>
+                      {invoice.status}
+                    </span>
+                    {invoice.status === 'paid' && (
+                      <span className="paid-amount">
+                        Paid: ${(invoice.totalPaid || invoice.amount).toFixed(2)}
+                      </span>
+                    )}
+                    {invoice.status === 'partial' && (
+                      <span className="balance">
+                        Balance: ${(invoice.balance || 0).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="invoice-amount">
+                    <strong>${invoice.amount.toFixed(2)}</strong>
+                  </div>
+                  {invoice.status !== 'paid' && (
+                    <button 
+                      className="btn-secondary"
+                      onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setPaymentData({
+                          ...paymentData,
+                          amount: invoice.balance || invoice.amount
+                        });
+                        setShowPaymentModal(true);
+                      }}
+                    >
+                      <CreditCard size={16} />
+                      Record Payment
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <p>No invoices generated for this client yet.</p>
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedInvoice && (
+        <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Record Payment for {selectedInvoice.invoiceNumber}</h3>
+              <button className="btn-icon" onClick={() => setShowPaymentModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Payment Amount</label>
+                <input
+                  type="number"
+                  value={paymentData.amount}
+                  onChange={(e) => setPaymentData({...paymentData, amount: e.target.value})}
+                  max={selectedInvoice.balance || selectedInvoice.amount}
+                  step="0.01"
+                />
+                <small>Balance Due: ${(selectedInvoice.balance || selectedInvoice.amount).toFixed(2)}</small>
+              </div>
+              <div className="form-group">
+                <label>Payment Date</label>
+                <input
+                  type="date"
+                  value={paymentData.date}
+                  onChange={(e) => setPaymentData({...paymentData, date: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Payment Method</label>
+                <select
+                  value={paymentData.method}
+                  onChange={(e) => setPaymentData({...paymentData, method: e.target.value})}
+                >
+                  <option value="check">Check</option>
+                  <option value="credit_card">Credit Card</option>
+                  <option value="ach">ACH Transfer</option>
+                  <option value="wire">Wire Transfer</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Reference Number (Optional)</label>
+                <input
+                  type="text"
+                  value={paymentData.referenceNumber}
+                  onChange={(e) => setPaymentData({...paymentData, referenceNumber: e.target.value})}
+                  placeholder="Check # or Transaction ID"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowPaymentModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={recordPayment}>
+                Record Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

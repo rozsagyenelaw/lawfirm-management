@@ -110,7 +110,7 @@ body {
   gap: 10px;
   font-size: 20px;
   font-weight: 600;
-  color: var(--primary);
+  color: white;
 }
 
 .collapse-btn {
@@ -5239,6 +5239,7 @@ input:checked + .slider:before {
 .email-actions-buttons button {
   flex: 1;
 }
+
 
 
 

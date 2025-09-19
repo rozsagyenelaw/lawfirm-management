@@ -24,6 +24,7 @@ export const DataProvider = ({ children }) => {
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState([]);
   const [trustAccounts, setTrustAccounts] = useState([]);
+  const [formFilings, setFormFilings] = useState([]);
   const [workflows] = useState(getDefaultWorkflows());
   const [isOnline, setIsOnline] = useState(true);
   const [syncStatus, setSyncStatus] = useState('local'); // 'local', 'syncing', 'synced'
@@ -42,6 +43,7 @@ export const DataProvider = ({ children }) => {
       const savedInvoices = localStorage.getItem('invoices');
       const savedPayments = localStorage.getItem('payments');
       const savedTrustAccounts = localStorage.getItem('trustAccounts');
+      const savedFormFilings = localStorage.getItem('formFilings');
       
       setClients(savedClients ? JSON.parse(savedClients) : []);
       setTasks(savedTasks ? JSON.parse(savedTasks) : []);
@@ -50,6 +52,7 @@ export const DataProvider = ({ children }) => {
       setInvoices(savedInvoices ? JSON.parse(savedInvoices) : []);
       setPayments(savedPayments ? JSON.parse(savedPayments) : []);
       setTrustAccounts(savedTrustAccounts ? JSON.parse(savedTrustAccounts) : []);
+      setFormFilings(savedFormFilings ? JSON.parse(savedFormFilings) : []);
       setSyncStatus('local');
     } else {
       // Firebase mode
@@ -63,6 +66,7 @@ export const DataProvider = ({ children }) => {
       const localInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
       const localPayments = JSON.parse(localStorage.getItem('payments') || '[]');
       const localTrustAccounts = JSON.parse(localStorage.getItem('trustAccounts') || '[]');
+      const localFormFilings = JSON.parse(localStorage.getItem('formFilings') || '[]');
       
       // Set local data immediately
       setClients(localClients);
@@ -72,6 +76,7 @@ export const DataProvider = ({ children }) => {
       setInvoices(localInvoices);
       setPayments(localPayments);
       setTrustAccounts(localTrustAccounts);
+      setFormFilings(localFormFilings);
       
       // Real-time sync for clients
       const unsubClients = onSnapshot(
@@ -168,6 +173,19 @@ export const DataProvider = ({ children }) => {
         }
       );
       
+      // Real-time sync for form filings
+      const unsubFormFilings = onSnapshot(
+        collection(db, 'formFilings'),
+        (snapshot) => {
+          const formFilingsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setFormFilings(formFilingsList);
+          localStorage.setItem('formFilings', JSON.stringify(formFilingsList));
+        }
+      );
+      
       setSyncStatus('synced');
       
       // Migrate existing localStorage data to Firebase
@@ -231,6 +249,16 @@ export const DataProvider = ({ children }) => {
         });
       }
       
+      if (localFormFilings.length > 0) {
+        localFormFilings.forEach(async (filing) => {
+          try {
+            await setDoc(doc(db, 'formFilings', filing.id), filing);
+          } catch (error) {
+            console.error('Error migrating form filing:', error);
+          }
+        });
+      }
+      
       return () => {
         unsubClients();
         unsubTasks();
@@ -239,6 +267,7 @@ export const DataProvider = ({ children }) => {
         unsubInvoices();
         unsubPayments();
         unsubTrustAccounts();
+        unsubFormFilings();
       };
     }
   }, [useFirebase]);
@@ -285,6 +314,12 @@ export const DataProvider = ({ children }) => {
       localStorage.setItem('trustAccounts', JSON.stringify(trustAccounts));
     }
   }, [trustAccounts, useFirebase]);
+
+  useEffect(() => {
+    if (!useFirebase) {
+      localStorage.setItem('formFilings', JSON.stringify(formFilings));
+    }
+  }, [formFilings, useFirebase]);
   
   // Monitor online status
   useEffect(() => {
@@ -737,6 +772,53 @@ export const DataProvider = ({ children }) => {
     toast.success('Trust funds transferred to operating account');
   };
 
+  // Forms Tracking functions
+  const addFormFiling = async (filingData) => {
+    const newFiling = {
+      id: uuidv4(),
+      ...filingData,
+      createdAt: new Date().toISOString()
+    };
+    
+    if (useFirebase && isOnline) {
+      try {
+        await setDoc(doc(db, 'formFilings', newFiling.id), newFiling);
+        toast.success('Form filing recorded');
+      } catch (error) {
+        console.error('Error adding form filing:', error);
+        setFormFilings([...formFilings, newFiling]);
+      }
+    } else {
+      setFormFilings([...formFilings, newFiling]);
+      toast.success('Form filing recorded');
+    }
+    
+    return newFiling;
+  };
+
+  const getClientFormFilings = (clientId) => {
+    return formFilings.filter(filing => filing.clientId === clientId);
+  };
+
+  const updateFormFiling = async (id, updates) => {
+    if (useFirebase && isOnline) {
+      try {
+        await updateDoc(doc(db, 'formFilings', id), updates);
+        toast.success('Filing updated');
+      } catch (error) {
+        console.error('Error updating filing:', error);
+        setFormFilings(formFilings.map(filing => 
+          filing.id === id ? { ...filing, ...updates } : filing
+        ));
+      }
+    } else {
+      setFormFilings(formFilings.map(filing => 
+        filing.id === id ? { ...filing, ...updates } : filing
+      ));
+      toast.success('Filing updated');
+    }
+  };
+
   const calculateDueDate = (daysFromStart) => {
     const date = new Date();
     date.setDate(date.getDate() + daysFromStart);
@@ -786,6 +868,7 @@ export const DataProvider = ({ children }) => {
     invoices,
     payments,
     trustAccounts,
+    formFilings,
     workflows,
     isOnline,
     syncStatus,
@@ -810,6 +893,10 @@ export const DataProvider = ({ children }) => {
     getClientPayments,
     getClientTrustBalance,
     transferTrustToOperating,
+    addFormFiling,
+    getClientFormFilings,
+    updateFormFiling,
+    getFormsLibrary,
     getClientTasks,
     getClientDocuments,
     getClientEvents,
@@ -899,6 +986,136 @@ function getDefaultWorkflows() {
         { name: 'Document Damages', description: 'Photograph and document all property damage', daysFromStart: 2 },
         { name: 'Insurance Claim', description: 'File insurance claim with carrier', daysFromStart: 5 },
         { name: 'Settlement Negotiations', description: 'Negotiate with insurance/responsible parties', daysFromStart: 60 }
+      ]
+    }
+  };
+}
+
+function getFormsLibrary() {
+  return {
+    'probate': {
+      name: 'Probate',
+      stages: [
+        {
+          name: 'Initial Filing',
+          daysFromStart: 0,
+          forms: [
+            { code: 'PR-010', name: 'Cover Sheet', required: true },
+            { code: 'DE-147', name: 'Duties and Liabilities of Personal Representative', required: true },
+            { code: 'DE-147S', name: 'Supplement to DE-147', required: true }
+          ]
+        },
+        {
+          name: 'After Court Date Receipt',
+          daysFromStart: 10,
+          forms: [
+            { code: 'PUBLICATION', name: 'Publication (Daily Journal)', required: true, isService: true },
+            { code: 'DE-121', name: 'Notice of Petition to Administer Estate', required: true }
+          ]
+        },
+        {
+          name: 'After Appointment Hearing',
+          daysFromStart: 30,
+          forms: [
+            { code: 'DE-140', name: 'Order for Probate', required: true },
+            { code: 'DE-150', name: 'Letters', required: true }
+          ]
+        },
+        {
+          name: '4 Months After Letters',
+          daysFromStart: 151,
+          forms: [
+            { code: 'PETITION-DIST', name: 'Petition for Distribution', required: true }
+          ]
+        }
+      ]
+    },
+    'conservatorship': {
+      name: 'Conservatorship',
+      stages: [
+        {
+          name: 'Initial Filing',
+          daysFromStart: 0,
+          forms: [
+            { code: 'PR-010', name: 'Cover Sheet', required: true },
+            { code: 'GC-310', name: 'Petition for Appointment of Probate Conservator', required: true },
+            { code: 'GC-313', name: 'Supplemental to GC-310', required: true },
+            { code: 'GC-320', name: 'Citation for Conservatorship', required: true },
+            { code: 'GC-020', name: 'Notice of Hearing', required: true },
+            { code: 'GC-312', name: 'Confidential Supplemental Information Form', required: true },
+            { code: 'GC-314', name: 'Confidential Conservator Screening Form', required: true },
+            { code: 'GC-348', name: 'Duties of Conservator', required: true },
+            { code: 'CONSENT', name: 'Consent Form', required: false }
+          ]
+        },
+        {
+          name: 'After Case Number',
+          daysFromStart: 10,
+          forms: [
+            { code: 'GC-335', name: 'Capacity Declaration', required: true },
+            { code: 'GC-335A', name: 'Supplement - Dementia', required: false, conditional: 'if dementia' }
+          ]
+        },
+        {
+          name: 'After Appointment',
+          daysFromStart: 31,
+          forms: [
+            { code: 'GC-340', name: 'Order Appointing Probate Conservator', required: true },
+            { code: 'GC-350', name: 'Letters of Conservatorship', required: true }
+          ]
+        },
+        {
+          name: 'Post-Appointment',
+          daysFromStart: 60,
+          forms: [
+            { code: 'GC-355', name: 'Confidential Care Plan', required: true },
+            { code: 'GC-356', name: 'Supplemental Care Plan', required: true }
+          ]
+        },
+        {
+          name: 'Biennial',
+          daysFromStart: 730,
+          recurring: true,
+          forms: [
+            { code: 'ACCOUNTING', name: 'Accounting (if Estate)', required: false, conditional: 'if estate' }
+          ]
+        }
+      ]
+    },
+    'guardianship': {
+      name: 'Guardianship',
+      stages: [
+        {
+          name: 'Initial Filing',
+          daysFromStart: 0,
+          forms: [
+            { code: 'GC-210', name: 'Petition for Appointment of Guardian of Minor', required: true },
+            { code: 'GC-020', name: 'Notice of Hearing', required: true },
+            { code: 'GC-210(CA)', name: 'Child Information Attachment', required: true, perChild: true },
+            { code: 'ICWA-010(A)', name: 'Indian Child Inquiry Attachment', required: true, perChild: true },
+            { code: 'GC-211', name: 'Consent, Nomination and Waiver of Notice', required: true },
+            { code: 'GC-212', name: 'Confidential Guardianship Screening Form', required: true },
+            { code: 'GC-248', name: 'Duties of Guardian and Acknowledgment', required: true },
+            { code: 'FL-105', name: 'Declaration Under UCCJEA', required: false, conditional: 'not estate only' }
+          ]
+        },
+        {
+          name: 'After Appointment',
+          daysFromStart: 31,
+          forms: [
+            { code: 'GC-240', name: 'Order Appointing Guardian of Minor', required: true },
+            { code: 'GC-250', name: 'Letters of Guardianship', required: true }
+          ]
+        },
+        {
+          name: 'Annual Reporting',
+          daysFromStart: 365,
+          recurring: true,
+          forms: [
+            { code: 'STATUS-REPORT', name: 'Annual Status Report', required: true },
+            { code: 'ACCOUNTING', name: 'Accounting (if Estate)', required: false, conditional: 'if estate' }
+          ]
+        }
       ]
     }
   };

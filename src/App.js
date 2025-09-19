@@ -9,7 +9,6 @@ import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';
-import Documents from './pages/Documents';
 import Settings from './pages/Settings';
 import CourtCalculator from './pages/CourtCalculator';
 import Kanban from './pages/Kanban';
@@ -46,7 +45,6 @@ function App() {
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/calendar" element={<Calendar />} />
-              <Route path="/documents" element={<Documents />} />
               <Route path="/court-calculator" element={<CourtCalculator />} />
               <Route path="/activity-log" element={<ActivityLogPage />} />
               <Route path="/settings" element={<Settings />} />

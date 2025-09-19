@@ -5435,6 +5435,62 @@ input:checked + .slider:before {
 .analysis-actions button {
   flex: 1;
 }
+/* Document Type Selector */
+.document-type-selector {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.document-type-selector label {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.document-type-select {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.doc-type-badge {
+  padding: 4px 12px;
+  background: var(--primary);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-left: auto;
+  margin-right: 10px;
+}
+
+.order-summary, .discovery-summary, .complaint-summary, 
+.settlement-summary, .expert-summary, .generic-summary {
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.deadlines-section {
+  padding: 15px;
+  background: #fff3e0;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 3px solid #ff9800;
+}
+
+.deadlines-section h5 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e65100;
+  margin-bottom: 10px;
+}
 
 
 

@@ -16,6 +16,7 @@ import ActivityLogPage from './pages/ActivityLogPage';
 import Invoices from './pages/Invoices';
 import Payments from './pages/Payments';
 import { DataProvider } from './context/DataContext';
+import FinancialAnalytics from './pages/FinancialAnalytics';
 import AllDocuments from './pages/AllDocuments';
 import './styles/App.css';
 
@@ -50,6 +51,7 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/payments" element={<Payments />} />
+              <Route path="/analytics" element={<FinancialAnalytics />} />
               <Route path="/court-calculator" element={<CourtCalculator />} />
               <Route path="/activity-log" element={<ActivityLogPage />} />
               <Route path="/all-documents" element={<AllDocuments />} />

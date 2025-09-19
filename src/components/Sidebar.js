@@ -14,6 +14,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { path: '/all-documents', icon: '📁', label: 'All Documents' },
     { path: '/court-calculator', icon: '🧮', label: 'Court Calculator' },
     { path: '/kanban', icon: '📋', label: 'Kanban Board' },
+    { path: '/fire-litigation', icon: '🔥', label: 'Fire Litigation' },
     { path: '/activity-log', icon: '📝', label: 'Activity Log' },
     { path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
@@ -51,6 +52,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
 };
 
 export default Sidebar;
+
 
 
 

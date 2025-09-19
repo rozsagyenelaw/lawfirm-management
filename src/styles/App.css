@@ -84,8 +84,26 @@ body {
 .sidebar-nav {
   flex: 1;
   padding: 20px 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 30px;
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
 }
 
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
 .nav-item {
   display: flex;
   align-items: center;
@@ -5193,6 +5211,7 @@ input:checked + .slider:before {
 .email-actions-buttons button {
   flex: 1;
 }
+
 
 
 

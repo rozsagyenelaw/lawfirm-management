@@ -14,6 +14,7 @@ import CourtCalculator from './pages/CourtCalculator';
 import Kanban from './pages/Kanban';
 import ActivityLogPage from './pages/ActivityLogPage';
 import { DataProvider } from './context/DataContext';
+import AllDocuments from './pages/AllDocuments';
 import './styles/App.css';
 
 function App() {
@@ -47,6 +48,7 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/court-calculator" element={<CourtCalculator />} />
               <Route path="/activity-log" element={<ActivityLogPage />} />
+              <Route path="/all-documents" element={<AllDocuments />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </main>

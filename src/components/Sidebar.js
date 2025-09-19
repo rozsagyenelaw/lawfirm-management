@@ -8,7 +8,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { path: '/clients', icon: '👥', label: 'Clients' },
     { path: '/tasks', icon: '✓', label: 'Tasks' },
     { path: '/calendar', icon: '📅', label: 'Calendar' },
-    { path: '/documents', icon: '📄', label: 'Documents' },
+    { path: '/all-documents', icon: '📁', label: 'All Documents' },
     { path: '/court-calculator', icon: '🧮', label: 'Court Calculator' },
     { path: '/kanban', icon: '📋', label: 'Kanban Board' },
     { path: '/activity-log', icon: '📝', label: 'Activity Log' },
@@ -48,5 +48,6 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
 };
 
 export default Sidebar;
+
 
 

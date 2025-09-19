@@ -3229,6 +3229,275 @@ input:checked + .slider:before {
   align-items: center;
   gap: 4px;
 }
+/* Pipeline Visualization */
+.pipeline-view {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.pipeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.view-controls {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 5px;
+  background: var(--light);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.view-tabs button {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-tabs button.active {
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+/* Funnel View */
+.funnel-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 40px 20px;
+}
+
+.funnel-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  color: white;
+  border-radius: 4px;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.funnel-stage:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow-lg);
+}
+
+.stage-content {
+  text-align: center;
+}
+
+.stage-content h3 {
+  font-size: 16px;
+  margin-bottom: 5px;
+}
+
+.stage-count {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.stage-time {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.funnel-legend {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 30px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+/* Flow View */
+.flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-x: auto;
+}
+
+.flow-stage {
+  flex-shrink: 0;
+}
+
+.stage-box {
+  background: white;
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 150px;
+  text-align: center;
+}
+
+.stage-box h4 {
+  margin-bottom: 15px;
+}
+
+.stage-metrics {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.flow-arrow {
+  font-size: 30px;
+  color: var(--text-light);
+  padding: 0 20px;
+}
+
+/* Metrics View */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.metric-card {
+  background: var(--light);
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.metric-header h4 {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.metric-card .metric-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.metric-sublabel {
+  display: block;
+  font-size: 12px;
+  color: var(--text-light);
+  font-weight: normal;
+}
+
+.bottlenecks-section {
+  margin: 30px 0;
+  padding: 20px;
+  background: #FEF3C7;
+  border-radius: 8px;
+}
+
+.bottlenecks-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  color: #92400E;
+}
+
+.bottleneck-item {
+  padding: 10px;
+  background: white;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bottleneck-item.high {
+  border-left: 4px solid #EF4444;
+}
+
+.bottleneck-item.medium {
+  border-left: 4px solid #F59E0B;
+}
+
+.case-types-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.case-types-table th {
+  background: var(--light);
+  padding: 10px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.case-types-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.success-rate {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.success-rate.high {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.success-rate.medium {
+  background: #FED7AA;
+  color: #92400E;
+}
+
+.success-rate.low {
+  background: #FEE2E2;
+  color: #991B1B;
+}
 
 
 

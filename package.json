@@ -14,7 +14,9 @@
     "lucide-react": "^0.263.1",
     "uuid": "^9.0.1",
     "recharts": "^2.9.3",
-    "firebase": "^10.7.0"
+    "firebase": "^10.7.0",
+    "jspdf": "^2.5.1",
+    "html2canvas": "^1.4.1"
   },
   "scripts": {
     "start": "react-scripts start",

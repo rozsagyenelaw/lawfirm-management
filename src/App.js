@@ -14,6 +14,7 @@ import CourtCalculator from './pages/CourtCalculator';
 import Kanban from './pages/Kanban';
 import ActivityLogPage from './pages/ActivityLogPage';
 import Invoices from './pages/Invoices';
+import Payments from './pages/Payments';
 import { DataProvider } from './context/DataContext';
 import AllDocuments from './pages/AllDocuments';
 import './styles/App.css';
@@ -48,6 +49,7 @@ function App() {
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/invoices" element={<Invoices />} />
+              <Route path="/payments" element={<Payments />} />
               <Route path="/court-calculator" element={<CourtCalculator />} />
               <Route path="/activity-log" element={<ActivityLogPage />} />
               <Route path="/all-documents" element={<AllDocuments />} />

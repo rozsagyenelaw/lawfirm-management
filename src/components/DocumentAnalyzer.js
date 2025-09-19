@@ -12,6 +12,7 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
   
   // Your OpenAI API key from environment variable
   const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_KEY;
+  console.log('API Key loaded:', OPENAI_API_KEY ? 'Yes' : 'No'); // ADD THIS LINE
 
   const documentTypes = [
     { value: 'auto', label: 'Auto-Detect Type', icon: Search },

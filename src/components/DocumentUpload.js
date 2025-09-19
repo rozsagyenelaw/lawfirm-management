@@ -1,13 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 import { Upload, FileText, Download, Trash2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const DocumentUpload = ({ clientId, clientName }) => {
   const [uploading, setUploading] = useState(false);
   const [documents, setDocuments] = useState([]);
+  
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const clientRef = doc(db, 'clients', clientId);
+        const clientDoc = await getDoc(clientRef);
+        if (clientDoc.exists() && clientDoc.data().documents) {
+          setDocuments(clientDoc.data().documents);
+        }
+      } catch (error) {
+        console.error('Error loading documents:', error);
+      }
+    };
+    loadDocuments();
+  }, [clientId]);
   
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];

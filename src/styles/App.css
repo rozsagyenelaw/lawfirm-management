@@ -1,3 +1,4 @@
+
 * {
   margin: 0;
   padding: 0;
@@ -35,7 +36,7 @@ body {
 /* Fix for Sidebar Scrolling */
 .sidebar {
   width: 250px;
-  background: white;
+  background: var(--dark);
   color: white;
   padding: 20px 0;
   display: flex;
@@ -110,7 +111,7 @@ body {
   gap: 10px;
   font-size: 20px;
   font-weight: 600;
-  color: white;
+  color: var(--primary);
 }
 
 .collapse-btn {
@@ -138,7 +139,7 @@ body {
   gap: 12px;
   padding: 12px;
   margin-bottom: 5px;
-  color: white;
+  color: var(--text);
   text-decoration: none;
   border-radius: 8px;
   transition: all 0.2s;
@@ -5239,8 +5240,6 @@ input:checked + .slider:before {
 .email-actions-buttons button {
   flex: 1;
 }
-
-
 
 
 

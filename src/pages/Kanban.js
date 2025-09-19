@@ -1,5 +1,6 @@
 import React from 'react';
 import KanbanBoard from '../components/KanbanBoard';
+import PipelineView from '../components/PipelineView';
 
 const Kanban = () => {
   return (
@@ -10,6 +11,7 @@ const Kanban = () => {
       </div>
       
       <KanbanBoard />
+      <PipelineView />
     </div>
   );
 };

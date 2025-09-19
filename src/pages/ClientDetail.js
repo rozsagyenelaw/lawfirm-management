@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard, Flame } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import DocumentUpload from '../components/DocumentUpload';
 import InvoiceGenerator from '../components/InvoiceGenerator';
 import PaymentManager from '../components/PaymentManager';
 import FormsTracker from '../components/FormsTracker';
+import DamageCalculator from '../components/DamageCalculator';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -49,6 +50,21 @@ const ClientDetail = () => {
   const clientEvents = getClientEvents(id);
   const clientInvoices = getClientInvoices(id);
   const trustBalance = getClientTrustBalance(id);
+
+  // Get damage estimate summary for fire victim clients
+  const getDamagesSummary = () => {
+    if (client.category !== 'fire-victim' || !client.damageEstimates) {
+      return null;
+    }
+    
+    const estimates = client.damageEstimates;
+    const totalClaimed = estimates.totalClaimed || 0;
+    const gapAmount = estimates.gapAmount || 0;
+    
+    return { totalClaimed, gapAmount };
+  };
+
+  const damagesSummary = getDamagesSummary();
 
   const handleUpdate = () => {
     updateClient(id, editData);
@@ -227,6 +243,15 @@ const ClientDetail = () => {
               Forms
             </button>
           )}
+          {client.category === 'fire-victim' && (
+            <button 
+              className={`tab ${activeTab === 'damages' ? 'active' : ''}`}
+              onClick={() => setActiveTab('damages')}
+            >
+              <Flame size={16} />
+              Damages
+            </button>
+          )}
         </div>
 
         <div className="tab-content">
@@ -318,6 +343,20 @@ const ClientDetail = () => {
                     <CreditCard size={18} />
                     <span>${trustBalance.toFixed(2)} in trust</span>
                   </div>
+                  {damagesSummary && (
+                    <>
+                      <div className="stat-item">
+                        <Flame size={18} />
+                        <span>${damagesSummary.totalClaimed.toLocaleString()} total damages</span>
+                      </div>
+                      {damagesSummary.gapAmount > 0 && (
+                        <div className="stat-item" style={{ color: '#dc2626' }}>
+                          <DollarSign size={18} />
+                          <span>${damagesSummary.gapAmount.toLocaleString()} gap amount</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -421,6 +460,15 @@ const ClientDetail = () => {
                   <p>Forms tracking is not available for {categories[client.category]}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'damages' && client.category === 'fire-victim' && (
+            <div className="section-content">
+              <DamageCalculator 
+                clientId={id} 
+                clientName={client.name}
+              />
             </div>
           )}
         </div>

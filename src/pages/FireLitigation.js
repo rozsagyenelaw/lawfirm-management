@@ -3,6 +3,7 @@ import { Flame, AlertTriangle, Calendar, Mail, FileText, Users, Clock, CheckCirc
 import { format, isAfter, addDays, differenceInDays } from 'date-fns';
 import { useData } from '../context/DataContext';
 import toast from 'react-hot-toast';
+import DocumentAnalyzer from '../components/DocumentAnalyzer';
 
 const FireLitigation = () => {
   const { clients, addTask, addEvent, addDocument } = useData();
@@ -13,6 +14,7 @@ const FireLitigation = () => {
   const [importData, setImportData] = useState('');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [deadlines, setDeadlines] = useState([]);
+  const [showDocumentAnalyzer, setShowDocumentAnalyzer] = useState(false);
   
   const fireClients = clients.filter(c => c.category === 'fire-victim');
   const eatonClients = fireClients.filter(c => 
@@ -101,6 +103,10 @@ const FireLitigation = () => {
     return true;
   });
   
+  const filteredClients = activeCase === 'all' ? fireClients : 
+                         activeCase === 'eaton' ? eatonClients : 
+                         pacificClients;
+  
   const upcomingDeadlines = deadlines
     .filter(d => isAfter(new Date(d.date), new Date()))
     .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -114,6 +120,17 @@ const FireLitigation = () => {
     return `${days} days`;
   };
   
+  // Common documents for fire litigation
+  const commonDocuments = [
+    { name: 'Master Complaint - Eaton Fire', type: 'complaint', case: 'eaton' },
+    { name: 'Master Complaint - Pacific Palisades', type: 'complaint', case: 'pacific' },
+    { name: 'Plaintiff Fact Sheet Template', type: 'form', case: 'all' },
+    { name: 'Property Damage Checklist', type: 'checklist', case: 'all' },
+    { name: 'Insurance Claim Template', type: 'template', case: 'all' },
+    { name: 'Discovery Requests - Standard', type: 'discovery', case: 'all' },
+    { name: 'Expert Witness List', type: 'resource', case: 'all' }
+  ];
+  
   return (
     <div className="fire-litigation">
       <div className="page-header">
@@ -125,6 +142,13 @@ const FireLitigation = () => {
           <p>Manage Eaton Fire and Pacific Palisades cases</p>
         </div>
         <div className="header-actions">
+          <button 
+            className="btn-secondary"
+            onClick={() => setShowDocumentAnalyzer(!showDocumentAnalyzer)}
+          >
+            <FileText size={18} />
+            {showDocumentAnalyzer ? 'Hide' : 'Show'} Document Analyzer
+          </button>
           <button 
             className="btn-primary"
             onClick={() => setShowImportModal(true)}
@@ -174,7 +198,48 @@ const FireLitigation = () => {
         </div>
       )}
       
+      {/* Document Analyzer Section */}
+      {showDocumentAnalyzer && (
+        <div style={{ marginBottom: '20px' }}>
+          <DocumentAnalyzer 
+            clientId={activeCase} 
+            clientName={
+              activeCase === 'all' ? 'All Fire Clients' :
+              activeCase === 'eaton' ? 'Eaton Fire Clients' : 
+              'Pacific Palisades Clients'
+            } 
+          />
+        </div>
+      )}
+      
       <div className="fire-litigation-grid">
+        {/* Client Overview */}
+        <div className="fire-section">
+          <h3>
+            <Users size={20} />
+            Client Overview
+          </h3>
+          <div className="client-cards">
+            {filteredClients.map(client => (
+              <div key={client.id} className="client-card">
+                <div className="client-name">{client.name}</div>
+                <div className="client-case">
+                  {client.notes?.toLowerCase().includes('eaton') || client.fireCase === 'eaton' ? 
+                    'Eaton Fire' : 'Pacific Palisades'}
+                </div>
+                <div className="client-status">
+                  <span className="status-indicator"></span>
+                  Documents: In Progress
+                </div>
+              </div>
+            ))}
+          </div>
+          {filteredClients.length === 0 && (
+            <p className="empty-state">No clients for this case filter</p>
+          )}
+        </div>
+        
+        {/* Email Summaries */}
         <div className="fire-section">
           <h3>
             <Mail size={20} />
@@ -201,9 +266,62 @@ const FireLitigation = () => {
                 )}
               </div>
             ))}
+            {filteredEmails.length === 0 && (
+              <p className="empty-state">No email summaries yet. Import your first summary to get started.</p>
+            )}
           </div>
         </div>
         
+        {/* Upcoming Deadlines */}
+        <div className="fire-section">
+          <h3>
+            <Calendar size={20} />
+            Upcoming Deadlines
+          </h3>
+          <div className="deadline-list">
+            {upcomingDeadlines.map(deadline => (
+              <div key={deadline.id} className="deadline-item">
+                <div className={`deadline-days ${
+                  differenceInDays(new Date(deadline.date), new Date()) <= 3 ? 'urgent' : ''
+                }`}>
+                  {daysUntil(deadline.date)}
+                </div>
+                <div className="deadline-info">
+                  <div className="deadline-desc">{deadline.description}</div>
+                  <div className="deadline-date">
+                    {format(new Date(deadline.date), 'MMMM dd, yyyy')}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {upcomingDeadlines.length === 0 && (
+              <p className="empty-state">No upcoming deadlines</p>
+            )}
+          </div>
+        </div>
+        
+        {/* Master Documents */}
+        <div className="fire-section">
+          <h3>
+            <FileText size={20} />
+            Master Documents & Templates
+          </h3>
+          <div className="document-list">
+            {commonDocuments
+              .filter(doc => activeCase === 'all' || doc.case === activeCase || doc.case === 'all')
+              .map((doc, index) => (
+              <div key={index} className="document-item">
+                <FileText size={16} />
+                <span>{doc.name}</span>
+                <button className="btn-text">
+                  <Download size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Email Detail Panel */}
         {selectedEmail && (
           <div className="fire-section email-detail">
             <h3>Email Details</h3>
@@ -249,14 +367,17 @@ const FireLitigation = () => {
                 </div>
               )}
               
-              <a href={selectedEmail.fullBodyUrl} target="_blank" rel="noopener noreferrer">
-                View original in Gmail →
-              </a>
+              {selectedEmail.fullBodyUrl && (
+                <a href={selectedEmail.fullBodyUrl} target="_blank" rel="noopener noreferrer">
+                  View original in Gmail →
+                </a>
+              )}
             </div>
           </div>
         )}
       </div>
       
+      {/* Import Modal */}
       {showImportModal && (
         <div className="modal-overlay" onClick={() => setShowImportModal(false)}>
           <div className="modal large" onClick={e => e.stopPropagation()}>

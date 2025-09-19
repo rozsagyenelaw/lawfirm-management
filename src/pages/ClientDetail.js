@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import DocumentUpload from '../components/DocumentUpload';
+import InvoiceGenerator from '../components/InvoiceGenerator';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -15,6 +16,7 @@ const ClientDetail = () => {
     getClientTasks,
     getClientDocuments,
     getClientEvents,
+    getClientInvoices,
     addTask,
     addDocument,
     addEvent
@@ -42,6 +44,7 @@ const ClientDetail = () => {
   const clientTasks = getClientTasks(id);
   const clientDocuments = getClientDocuments(id);
   const clientEvents = getClientEvents(id);
+  const clientInvoices = getClientInvoices(id);
 
   const handleUpdate = () => {
     updateClient(id, editData);
@@ -198,6 +201,12 @@ const ClientDetail = () => {
           >
             Events ({clientEvents.length})
           </button>
+          <button 
+            className={`tab ${activeTab === 'invoice' ? 'active' : ''}`}
+            onClick={() => setActiveTab('invoice')}
+          >
+            Invoice ({clientInvoices.length})
+          </button>
         </div>
 
         <div className="tab-content">
@@ -281,6 +290,10 @@ const ClientDetail = () => {
                     <Clock size={18} />
                     <span>{clientEvents.length} scheduled events</span>
                   </div>
+                  <div className="stat-item">
+                    <DollarSign size={18} />
+                    <span>{clientInvoices.length} invoices</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -352,6 +365,12 @@ const ClientDetail = () => {
               ) : (
                 <p className="empty-state">No events for this client</p>
               )}
+            </div>
+          )}
+
+          {activeTab === 'invoice' && (
+            <div className="section-content">
+              <InvoiceGenerator clientId={id} clientName={client.name} />
             </div>
           )}
         </div>

@@ -22,6 +22,8 @@ export const DataProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [trustAccounts, setTrustAccounts] = useState([]);
   const [workflows] = useState(getDefaultWorkflows());
   const [isOnline, setIsOnline] = useState(true);
   const [syncStatus, setSyncStatus] = useState('local'); // 'local', 'syncing', 'synced'
@@ -38,12 +40,16 @@ export const DataProvider = ({ children }) => {
       const savedEvents = localStorage.getItem('events');
       const savedDocuments = localStorage.getItem('documents');
       const savedInvoices = localStorage.getItem('invoices');
+      const savedPayments = localStorage.getItem('payments');
+      const savedTrustAccounts = localStorage.getItem('trustAccounts');
       
       setClients(savedClients ? JSON.parse(savedClients) : []);
       setTasks(savedTasks ? JSON.parse(savedTasks) : []);
       setEvents(savedEvents ? JSON.parse(savedEvents) : []);
       setDocuments(savedDocuments ? JSON.parse(savedDocuments) : []);
       setInvoices(savedInvoices ? JSON.parse(savedInvoices) : []);
+      setPayments(savedPayments ? JSON.parse(savedPayments) : []);
+      setTrustAccounts(savedTrustAccounts ? JSON.parse(savedTrustAccounts) : []);
       setSyncStatus('local');
     } else {
       // Firebase mode
@@ -55,6 +61,8 @@ export const DataProvider = ({ children }) => {
       const localEvents = JSON.parse(localStorage.getItem('events') || '[]');
       const localDocuments = JSON.parse(localStorage.getItem('documents') || '[]');
       const localInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+      const localPayments = JSON.parse(localStorage.getItem('payments') || '[]');
+      const localTrustAccounts = JSON.parse(localStorage.getItem('trustAccounts') || '[]');
       
       // Set local data immediately
       setClients(localClients);
@@ -62,6 +70,8 @@ export const DataProvider = ({ children }) => {
       setEvents(localEvents);
       setDocuments(localDocuments);
       setInvoices(localInvoices);
+      setPayments(localPayments);
+      setTrustAccounts(localTrustAccounts);
       
       // Real-time sync for clients
       const unsubClients = onSnapshot(
@@ -132,6 +142,32 @@ export const DataProvider = ({ children }) => {
         }
       );
       
+      // Real-time sync for payments
+      const unsubPayments = onSnapshot(
+        collection(db, 'payments'),
+        (snapshot) => {
+          const paymentsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setPayments(paymentsList);
+          localStorage.setItem('payments', JSON.stringify(paymentsList));
+        }
+      );
+      
+      // Real-time sync for trust accounts
+      const unsubTrustAccounts = onSnapshot(
+        collection(db, 'trustAccounts'),
+        (snapshot) => {
+          const trustAccountsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setTrustAccounts(trustAccountsList);
+          localStorage.setItem('trustAccounts', JSON.stringify(trustAccountsList));
+        }
+      );
+      
       setSyncStatus('synced');
       
       // Migrate existing localStorage data to Firebase
@@ -175,12 +211,34 @@ export const DataProvider = ({ children }) => {
         });
       }
       
+      if (localPayments.length > 0) {
+        localPayments.forEach(async (payment) => {
+          try {
+            await setDoc(doc(db, 'payments', payment.id), payment);
+          } catch (error) {
+            console.error('Error migrating payment:', error);
+          }
+        });
+      }
+      
+      if (localTrustAccounts.length > 0) {
+        localTrustAccounts.forEach(async (account) => {
+          try {
+            await setDoc(doc(db, 'trustAccounts', account.id), account);
+          } catch (error) {
+            console.error('Error migrating trust account:', error);
+          }
+        });
+      }
+      
       return () => {
         unsubClients();
         unsubTasks();
         unsubEvents();
         unsubDocs();
         unsubInvoices();
+        unsubPayments();
+        unsubTrustAccounts();
       };
     }
   }, [useFirebase]);
@@ -215,6 +273,18 @@ export const DataProvider = ({ children }) => {
       localStorage.setItem('invoices', JSON.stringify(invoices));
     }
   }, [invoices, useFirebase]);
+
+  useEffect(() => {
+    if (!useFirebase) {
+      localStorage.setItem('payments', JSON.stringify(payments));
+    }
+  }, [payments, useFirebase]);
+
+  useEffect(() => {
+    if (!useFirebase) {
+      localStorage.setItem('trustAccounts', JSON.stringify(trustAccounts));
+    }
+  }, [trustAccounts, useFirebase]);
   
   // Monitor online status
   useEffect(() => {
@@ -520,6 +590,153 @@ export const DataProvider = ({ children }) => {
     return invoices.filter(inv => inv.clientId === clientId);
   };
 
+  // Payment and Trust Account functions
+  const addPayment = async (paymentData) => {
+    const newPayment = {
+      id: uuidv4(),
+      ...paymentData,
+      createdAt: new Date().toISOString()
+    };
+    
+    if (useFirebase && isOnline) {
+      try {
+        await setDoc(doc(db, 'payments', newPayment.id), newPayment);
+        toast.success('Payment recorded');
+      } catch (error) {
+        console.error('Error adding payment:', error);
+        setPayments([...payments, newPayment]);
+      }
+    } else {
+      setPayments([...payments, newPayment]);
+      toast.success('Payment recorded');
+    }
+    
+    // Update trust account balance if retainer
+    if (paymentData.type === 'retainer' && paymentData.account === 'trust') {
+      updateTrustBalance(paymentData.clientId, paymentData.amount, 'deposit');
+    }
+    
+    return newPayment;
+  };
+
+  const updateTrustBalance = async (clientId, amount, action) => {
+    const existingAccount = trustAccounts.find(ta => ta.clientId === clientId);
+    
+    if (existingAccount) {
+      const newBalance = action === 'deposit' 
+        ? existingAccount.balance + amount 
+        : existingAccount.balance - amount;
+        
+      const updatedAccount = {
+        ...existingAccount,
+        balance: newBalance,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      if (useFirebase && isOnline) {
+        try {
+          await updateDoc(doc(db, 'trustAccounts', existingAccount.id), updatedAccount);
+        } catch (error) {
+          console.error('Error updating trust account:', error);
+        }
+      }
+      
+      setTrustAccounts(trustAccounts.map(ta => 
+        ta.clientId === clientId ? updatedAccount : ta
+      ));
+    } else {
+      // Create new trust account
+      const newTrustAccount = {
+        id: uuidv4(),
+        clientId,
+        balance: amount,
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+      
+      if (useFirebase && isOnline) {
+        try {
+          await setDoc(doc(db, 'trustAccounts', newTrustAccount.id), newTrustAccount);
+        } catch (error) {
+          console.error('Error creating trust account:', error);
+        }
+      }
+      
+      setTrustAccounts([...trustAccounts, newTrustAccount]);
+    }
+  };
+
+  const applyRetainerToInvoice = async (clientId, invoiceId, amount) => {
+    // Deduct from trust account
+    updateTrustBalance(clientId, amount, 'withdraw');
+    
+    // Record the application
+    const application = {
+      id: uuidv4(),
+      clientId,
+      invoiceId,
+      amount,
+      type: 'retainer_applied',
+      account: 'operating',
+      description: 'Retainer applied to invoice',
+      createdAt: new Date().toISOString()
+    };
+    
+    addPayment(application);
+    
+    toast.success('Retainer applied to invoice');
+  };
+
+  const refundRetainer = async (clientId, amount, reason) => {
+    // Deduct from trust account
+    updateTrustBalance(clientId, amount, 'withdraw');
+    
+    // Record the refund
+    const refund = {
+      id: uuidv4(),
+      clientId,
+      amount,
+      type: 'retainer_refund',
+      account: 'trust',
+      description: reason || 'Unused retainer refund',
+      createdAt: new Date().toISOString()
+    };
+    
+    addPayment(refund);
+    
+    toast.success('Retainer refund processed');
+  };
+
+  const getClientPayments = (clientId) => {
+    return payments.filter(payment => payment.clientId === clientId);
+  };
+
+  const getClientTrustBalance = (clientId) => {
+    const account = trustAccounts.find(ta => ta.clientId === clientId);
+    return account ? account.balance : 0;
+  };
+
+  const transferTrustToOperating = async (clientId, amount, invoiceId = null) => {
+    // This is for earned fees - moving money from trust to operating
+    updateTrustBalance(clientId, amount, 'withdraw');
+    
+    const transfer = {
+      id: uuidv4(),
+      clientId,
+      amount,
+      type: 'trust_transfer',
+      fromAccount: 'trust',
+      toAccount: 'operating',
+      invoiceId,
+      description: 'Transfer from trust to operating for earned fees',
+      createdAt: new Date().toISOString()
+    };
+    
+    addPayment(transfer);
+    
+    toast.success('Trust funds transferred to operating account');
+  };
+
   const calculateDueDate = (daysFromStart) => {
     const date = new Date();
     date.setDate(date.getDate() + daysFromStart);
@@ -567,6 +784,8 @@ export const DataProvider = ({ children }) => {
     events,
     documents,
     invoices,
+    payments,
+    trustAccounts,
     workflows,
     isOnline,
     syncStatus,
@@ -584,6 +803,13 @@ export const DataProvider = ({ children }) => {
     deleteDocument,
     addInvoice,
     getClientInvoices,
+    addPayment,
+    updateTrustBalance,
+    applyRetainerToInvoice,
+    refundRetainer,
+    getClientPayments,
+    getClientTrustBalance,
+    transferTrustToOperating,
     getClientTasks,
     getClientDocuments,
     getClientEvents,

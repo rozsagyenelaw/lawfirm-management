@@ -11,10 +11,10 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
     invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
     hourlyRate: 350,
     invoiceDate: format(new Date(), 'yyyy-MM-dd'),
-    dueDate: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+    dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), // Changed to 15 days
     lineItems: [],
     notes: '',
-    paymentTerms: 'Net 30'
+    paymentTerms: 'Net 15' // Changed to Net 15
   });
   
   const [showAddItem, setShowAddItem] = useState(false);
@@ -140,16 +140,16 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
 
     const doc = new jsPDF();
     
-    // Header - Your Law Firm Info
+    // Header - Law Offices of Rozsa Gyene
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text('Your Law Firm Name', 20, 20);
+    doc.text('Law Offices of Rozsa Gyene', 20, 20);
     doc.setFont(undefined, 'normal');
     doc.setFontSize(10);
-    doc.text('123 Legal Street', 20, 27);
-    doc.text('City, State 12345', 20, 32);
-    doc.text('Phone: (555) 123-4567', 20, 37);
-    doc.text('Email: billing@lawfirm.com', 20, 42);
+    doc.text('450 N Brand Blvd. Suite 600', 20, 27);
+    doc.text('Glendale, CA 91203', 20, 32);
+    doc.text('Phone: (818) 291-6217', 20, 37);
+    doc.text('Email: rozsagyenelaw@yahoo.com', 20, 42);
     
     // Invoice Title
     doc.setFontSize(24);
@@ -220,23 +220,34 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
     doc.text(`$${calculateTotal().toFixed(2)}`, 185, yPosition, { align: 'right' });
     
     // Payment Terms and Notes
-    if (invoiceData.paymentTerms || invoiceData.notes) {
-      yPosition += 15;
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      
-      if (invoiceData.paymentTerms) {
-        doc.text(`Payment Terms: ${invoiceData.paymentTerms}`, 20, yPosition);
-        yPosition += 7;
-      }
-      
-      if (invoiceData.notes) {
-        doc.text('Notes:', 20, yPosition);
-        yPosition += 5;
-        const noteLines = doc.splitTextToSize(invoiceData.notes, 170);
-        doc.text(noteLines, 20, yPosition);
-      }
+    yPosition += 15;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    // Payment Terms
+    doc.text(`Payment Terms: ${invoiceData.paymentTerms}`, 20, yPosition);
+    yPosition += 7;
+    doc.text('Payment is due within 15 days of invoice date.', 20, yPosition);
+    yPosition += 7;
+    
+    // Payment Instructions
+    doc.text('Please make checks payable to: Law Offices of Rozsa Gyene', 20, yPosition);
+    yPosition += 7;
+    doc.text('Mail to: 450 N Brand Blvd. Suite 600, Glendale, CA 91203', 20, yPosition);
+    
+    // Additional Notes
+    if (invoiceData.notes) {
+      yPosition += 10;
+      doc.text('Additional Notes:', 20, yPosition);
+      yPosition += 5;
+      const noteLines = doc.splitTextToSize(invoiceData.notes, 170);
+      doc.text(noteLines, 20, yPosition);
     }
+    
+    // Thank you message
+    yPosition += 15;
+    doc.setFont(undefined, 'italic');
+    doc.text('Thank you for your business!', 20, yPosition);
     
     // Save the PDF
     doc.save(`invoice-${clientName}-${invoiceData.invoiceNumber}.pdf`);
@@ -292,7 +303,7 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
             />
           </div>
           <div className="invoice-field">
-            <label>Due Date</label>
+            <label>Due Date (Net 15)</label>
             <input
               type="date"
               value={invoiceData.dueDate}
@@ -393,7 +404,7 @@ const InvoiceGenerator = ({ clientId, clientName }) => {
           <textarea
             value={invoiceData.notes}
             onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
-            placeholder="Additional notes or payment instructions..."
+            placeholder="Additional notes or special instructions..."
             rows="3"
           />
         </div>

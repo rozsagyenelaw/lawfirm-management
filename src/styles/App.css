@@ -32,17 +32,64 @@ body {
   min-height: 100vh;
 }
 
-/* Sidebar */
+/* Fix for Sidebar Scrolling */
 .sidebar {
   width: 250px;
-  background: white;
-  border-right: 1px solid var(--border);
+  background: var(--dark);
+  color: white;
+  padding: 20px 0;
   display: flex;
   flex-direction: column;
-  position: fixed;
   height: 100vh;
-  transition: all 0.3s ease;
-  z-index: 100;
+  position: fixed;
+  left: 0;
+  top: 0;
+  overflow-y: auto; /* Add this - allows vertical scrolling */
+  overflow-x: hidden; /* Add this - prevents horizontal scroll */
+}
+
+/* Make sure sidebar items don't get cut off */
+.sidebar-menu {
+  flex: 1;
+  overflow-y: auto; /* Add this */
+  padding-bottom: 20px; /* Add some padding at bottom */
+}
+
+.sidebar-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Optional: Add scrollbar styling for better visibility */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Also update the main-layout to account for fixed sidebar */
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 250px; /* Push content to the right of fixed sidebar */
+  width: calc(100% - 250px);
+  overflow-x: hidden;
 }
 
 .sidebar.collapsed {
@@ -5192,6 +5239,7 @@ input:checked + .slider:before {
 .email-actions-buttons button {
   flex: 1;
 }
+
 
 
 

@@ -21,6 +21,7 @@ export const DataProvider = ({ children }) => {
   const [tasks, setTasks] = useState([]);
   const [events, setEvents] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [workflows] = useState(getDefaultWorkflows());
   const [isOnline, setIsOnline] = useState(true);
   const [syncStatus, setSyncStatus] = useState('local'); // 'local', 'syncing', 'synced'
@@ -36,11 +37,13 @@ export const DataProvider = ({ children }) => {
       const savedTasks = localStorage.getItem('tasks');
       const savedEvents = localStorage.getItem('events');
       const savedDocuments = localStorage.getItem('documents');
+      const savedInvoices = localStorage.getItem('invoices');
       
       setClients(savedClients ? JSON.parse(savedClients) : []);
       setTasks(savedTasks ? JSON.parse(savedTasks) : []);
       setEvents(savedEvents ? JSON.parse(savedEvents) : []);
       setDocuments(savedDocuments ? JSON.parse(savedDocuments) : []);
+      setInvoices(savedInvoices ? JSON.parse(savedInvoices) : []);
       setSyncStatus('local');
     } else {
       // Firebase mode
@@ -51,12 +54,14 @@ export const DataProvider = ({ children }) => {
       const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
       const localEvents = JSON.parse(localStorage.getItem('events') || '[]');
       const localDocuments = JSON.parse(localStorage.getItem('documents') || '[]');
+      const localInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
       
       // Set local data immediately
       setClients(localClients);
       setTasks(localTasks);
       setEvents(localEvents);
       setDocuments(localDocuments);
+      setInvoices(localInvoices);
       
       // Real-time sync for clients
       const unsubClients = onSnapshot(
@@ -114,6 +119,19 @@ export const DataProvider = ({ children }) => {
         }
       );
       
+      // Real-time sync for invoices
+      const unsubInvoices = onSnapshot(
+        collection(db, 'invoices'),
+        (snapshot) => {
+          const invoicesList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setInvoices(invoicesList);
+          localStorage.setItem('invoices', JSON.stringify(invoicesList));
+        }
+      );
+      
       setSyncStatus('synced');
       
       // Migrate existing localStorage data to Firebase
@@ -147,11 +165,22 @@ export const DataProvider = ({ children }) => {
         });
       }
       
+      if (localInvoices.length > 0) {
+        localInvoices.forEach(async (invoice) => {
+          try {
+            await setDoc(doc(db, 'invoices', invoice.id), invoice);
+          } catch (error) {
+            console.error('Error migrating invoice:', error);
+          }
+        });
+      }
+      
       return () => {
         unsubClients();
         unsubTasks();
         unsubEvents();
         unsubDocs();
+        unsubInvoices();
       };
     }
   }, [useFirebase]);
@@ -180,6 +209,12 @@ export const DataProvider = ({ children }) => {
       localStorage.setItem('documents', JSON.stringify(documents));
     }
   }, [documents, useFirebase]);
+
+  useEffect(() => {
+    if (!useFirebase) {
+      localStorage.setItem('invoices', JSON.stringify(invoices));
+    }
+  }, [invoices, useFirebase]);
   
   // Monitor online status
   useEffect(() => {
@@ -457,6 +492,34 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  // Invoice functions
+  const addInvoice = async (invoiceData) => {
+    const newInvoice = {
+      id: uuidv4(),
+      ...invoiceData,
+      createdAt: new Date().toISOString()
+    };
+    
+    if (useFirebase && isOnline) {
+      try {
+        await setDoc(doc(db, 'invoices', newInvoice.id), newInvoice);
+        toast.success('Invoice generated');
+      } catch (error) {
+        console.error('Error adding invoice:', error);
+        setInvoices([...invoices, newInvoice]);
+      }
+    } else {
+      setInvoices([...invoices, newInvoice]);
+      toast.success('Invoice generated');
+    }
+    
+    return newInvoice;
+  };
+
+  const getClientInvoices = (clientId) => {
+    return invoices.filter(inv => inv.clientId === clientId);
+  };
+
   const calculateDueDate = (daysFromStart) => {
     const date = new Date();
     date.setDate(date.getDate() + daysFromStart);
@@ -503,6 +566,7 @@ export const DataProvider = ({ children }) => {
     tasks,
     events,
     documents,
+    invoices,
     workflows,
     isOnline,
     syncStatus,
@@ -518,6 +582,8 @@ export const DataProvider = ({ children }) => {
     deleteEvent,
     addDocument,
     deleteDocument,
+    addInvoice,
+    getClientInvoices,
     getClientTasks,
     getClientDocuments,
     getClientEvents,

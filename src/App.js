@@ -18,6 +18,7 @@ import Payments from './pages/Payments';
 import { DataProvider } from './context/DataContext';
 import FinancialAnalytics from './pages/FinancialAnalytics';
 import AllDocuments from './pages/AllDocuments';
+import DocumentGeneration from './pages/DocumentGeneration';
 import FireLitigation from './pages/FireLitigation';
 import './styles/App.css';
 
@@ -56,6 +57,7 @@ function App() {
               <Route path="/court-calculator" element={<CourtCalculator />} />
               <Route path="/activity-log" element={<ActivityLogPage />} />
               <Route path="/all-documents" element={<AllDocuments />} />
+              <Route path="/document-generation" element={<DocumentGeneration />} />
               <Route path="/fire-litigation" element={<FireLitigation />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>

@@ -1,340 +1,258 @@
-/**
- * Document Automation Service
- * Integrates with all Netlify-hosted document generation apps
- */
+// DocumentAutomationService.js
+// Service for integrating with the Probate Form Automation API
 
 class DocumentAutomationService {
   constructor() {
-    // Configure your actual Netlify app URLs here
-    this.endpoints = {
-      probate: {
-        baseUrl: process.env.REACT_APP_PROBATE_URL || 'https://your-probate-app.netlify.app',
-        apiKey: process.env.REACT_APP_PROBATE_API_KEY || ''
-      },
-      conservatorship: {
-        baseUrl: process.env.REACT_APP_CONSERVATORSHIP_URL || 'https://your-conservatorship-app.netlify.app',
-        apiKey: process.env.REACT_APP_CONSERVATORSHIP_API_KEY || ''
-      },
-      guardianship: {
-        baseUrl: process.env.REACT_APP_GUARDIANSHIP_URL || 'https://your-guardianship-app.netlify.app',
-        apiKey: process.env.REACT_APP_GUARDIANSHIP_API_KEY || ''
-      },
-      trust: {
-        baseUrl: process.env.REACT_APP_TRUST_URL || 'https://your-trust-amendments-app.netlify.app',
-        apiKey: process.env.REACT_APP_TRUST_API_KEY || ''
-      }
+    // Use your actual probate automation app URL
+    this.baseUrl = 'https://probateformautomation.netlify.app/.netlify/functions';
+    this.documentHistory = JSON.parse(localStorage.getItem('documentHistory') || '{}');
+  }
+
+  // Map law firm client data to probate app format
+  mapClientDataToFormData(client, practiceArea) {
+    // Format heirs list as expected by the probate automation app
+    const formatHeirsList = () => {
+      if (!client.heirs || client.heirs.length === 0) return '';
+      
+      return client.heirs.map(heir => {
+        const age = heir.age || '';
+        return `${heir.name}, ${heir.relationship}, ${age}, ${heir.address}`;
+      }).join('\n');
     };
 
-    // Form mappings for each practice area
-    this.formMappings = {
-      probate: {
-        initial: [
-          { code: 'PR-010', name: 'Cover Sheet', endpoint: '/api/generate-pr010' },
-          { code: 'DE-111', name: 'Petition for Probate', endpoint: '/api/generate-de111' },
-          { code: 'DE-147', name: 'Duties and Liabilities', endpoint: '/api/generate-de147' },
-          { code: 'DE-147S', name: 'Supplement to DE-147', endpoint: '/api/generate-de147s' }
-        ],
-        afterHearing: [
-          { code: 'DE-140', name: 'Order for Probate', endpoint: '/api/generate-de140' },
-          { code: 'DE-150', name: 'Letters', endpoint: '/api/generate-de150' }
-        ],
-        notices: [
-          { code: 'DE-121', name: 'Notice of Petition', endpoint: '/api/generate-de121' }
-        ],
-        distribution: [
-          { code: 'DE-270', name: 'Petition for Distribution', endpoint: '/api/generate-de270' }
-        ]
-      },
-      conservatorship: {
-        initial: [
-          { code: 'PR-010', name: 'Cover Sheet', endpoint: '/api/generate-pr010' },
-          { code: 'GC-310', name: 'Petition for Appointment', endpoint: '/api/generate-gc310' },
-          { code: 'GC-313', name: 'Supplement to GC-310', endpoint: '/api/generate-gc313' },
-          { code: 'GC-320', name: 'Citation', endpoint: '/api/generate-gc320' },
-          { code: 'GC-312', name: 'Confidential Supplemental', endpoint: '/api/generate-gc312' },
-          { code: 'GC-314', name: 'Screening Form', endpoint: '/api/generate-gc314' },
-          { code: 'GC-348', name: 'Duties of Conservator', endpoint: '/api/generate-gc348' }
-        ],
-        capacity: [
-          { code: 'GC-335', name: 'Capacity Declaration', endpoint: '/api/generate-gc335' },
-          { code: 'GC-335A', name: 'Dementia Supplement', endpoint: '/api/generate-gc335a' }
-        ],
-        afterAppointment: [
-          { code: 'GC-340', name: 'Order Appointing', endpoint: '/api/generate-gc340' },
-          { code: 'GC-350', name: 'Letters of Conservatorship', endpoint: '/api/generate-gc350' }
-        ],
-        ongoing: [
-          { code: 'GC-355', name: 'Care Plan', endpoint: '/api/generate-gc355' },
-          { code: 'GC-356', name: 'Supplemental Care Plan', endpoint: '/api/generate-gc356' }
-        ]
-      },
-      guardianship: {
-        initial: [
-          { code: 'GC-210', name: 'Petition for Guardianship', endpoint: '/api/generate-gc210' },
-          { code: 'GC-020', name: 'Notice of Hearing', endpoint: '/api/generate-gc020' },
-          { code: 'GC-210(CA)', name: 'Child Information', endpoint: '/api/generate-gc210ca' },
-          { code: 'ICWA-010(A)', name: 'Indian Child Inquiry', endpoint: '/api/generate-icwa010a' },
-          { code: 'GC-211', name: 'Consent and Waiver', endpoint: '/api/generate-gc211' },
-          { code: 'GC-212', name: 'Screening Form', endpoint: '/api/generate-gc212' },
-          { code: 'GC-248', name: 'Duties of Guardian', endpoint: '/api/generate-gc248' },
-          { code: 'FL-105', name: 'UCCJEA Declaration', endpoint: '/api/generate-fl105' }
-        ],
-        afterAppointment: [
-          { code: 'GC-240', name: 'Order Appointing Guardian', endpoint: '/api/generate-gc240' },
-          { code: 'GC-250', name: 'Letters of Guardianship', endpoint: '/api/generate-gc250' }
-        ]
-      },
-      trust: {
-        amendments: [
-          { code: 'TRUST-AMD-1', name: 'First Amendment', endpoint: '/api/generate-amendment' },
-          { code: 'TRUST-RESTATE', name: 'Restatement', endpoint: '/api/generate-restatement' }
-        ],
-        notices: [
-          { code: 'TRUST-NOTICE', name: 'Notice to Beneficiaries', endpoint: '/api/generate-notice' }
-        ]
-      }
+    // The working process-form.js expects these exact field names
+    const baseData = {
+      // Decedent Information
+      decedent_name: client.decedentName || '',
+      death_date: client.dateOfDeath || '',
+      death_place: client.placeOfDeath || '',
+      death_address: client.deathAddress || '',
+      death_resident: client.californiaResident || 'yes',
+      
+      // Family Information
+      has_spouse: client.hasSpouse || 'no',
+      has_children: client.hasChildren || 'no',
+      has_grandchildren: client.hasGrandchildren || 'no',
+      
+      // Petitioner Information
+      petitioner_name: client.petitionerName || client.name || '',
+      petitioner_relationship: client.petitionerRelationship || '',
+      petitioner_address: client.petitionerAddress || client.address || '',
+      petitioner_phone: client.petitionerPhone || client.phone || '',
+      petitioner_is_executor: client.petitionerIsExecutor || 'no',
+      
+      // Estate Information
+      personal_property_value: client.personalPropertyValue || '0',
+      real_property_gross: client.realPropertyGross || '0',
+      real_property_encumbrance: client.realPropertyEncumbrance || '0',
+      has_will: client.hasWill ? 'yes' : 'no',
+      will_date: client.willDate || '',
+      will_self_proving: client.willSelfProving || 'no',
+      executor_named_in_will: client.executorNamedInWill || 'no',
+      
+      // Heirs and Beneficiaries (as newline-separated string)
+      heirs_list: formatHeirsList(),
+      
+      // Administration Details
+      admin_type: client.adminType || 'full',
+      bond_required: client.bondRequired || 'no',
+      bond_amount: client.bondAmount || '',
+      
+      // Court Information
+      court_county: client.courtCounty || 'LOS ANGELES',
+      court_branch: client.courtBranch || 'STANLEY MOSK COURTHOUSE',
+      
+      // Attorney Information (from process-form.js defaults)
+      attorney_name: "ROZSA GYENE, ESQ.",
+      attorney_bar: "208356",
+      firm_name: "LAW OFFICES OF ROZSA GYENE",
+      firm_street: "450 N BRAND BLVD SUITE 600",
+      firm_city: "GLENDALE",
+      firm_state: "CA",
+      firm_zip: "91203",
+      firm_phone: "818-291-6217",
+      firm_fax: "818-291-6205",
+      firm_email: "ROZSAGYENELAW@YAHOO.COM"
+    };
+
+    return baseData;
+  }
+
+  // Get available forms for probate
+  getAvailableForms(practiceArea) {
+    if (practiceArea !== 'probate') {
+      return {};
+    }
+
+    return {
+      initial: [
+        { code: 'DE-111', name: 'Petition for Probate' },
+        { code: 'DE-121', name: 'Notice of Petition to Administer Estate' },
+        { code: 'DE-122', name: 'Citation - Probate' },
+        { code: 'DE-131', name: 'Proof of Subscribing Witness' },
+        { code: 'DE-135', name: 'Proof of Holographic Instrument' },
+      ],
+      administration: [
+        { code: 'DE-140', name: 'Order for Probate' },
+        { code: 'DE-147', name: 'Duties and Liabilities of Personal Representative' },
+        { code: 'DE-150', name: 'Letters Testamentary/Administration' },
+        { code: 'DE-157', name: 'Notice of Administration to Creditors' },
+      ],
+      inventory: [
+        { code: 'DE-160', name: 'Inventory and Appraisal' },
+        { code: 'DE-161', name: 'Inventory and Appraisal Attachment' },
+      ],
+      accounting: [
+        { code: 'DE-172', name: 'Notice of Administration' },
+        { code: 'DE-174', name: 'Allowance or Rejection of Creditors Claim' },
+        { code: 'DE-260', name: 'Petition for Final Distribution' },
+        { code: 'DE-270', name: 'Ex Parte Petition for Final Discharge' },
+      ]
     };
   }
 
-  /**
-   * Generate a single document
-   */
-  async generateDocument(practiceArea, formCode, clientData) {
+  // Generate a single document
+  async generateDocument(practiceArea, formCode, client) {
     try {
-      const endpoint = this.endpoints[practiceArea];
-      if (!endpoint) {
-        throw new Error(`Unknown practice area: ${practiceArea}`);
-      }
-
-      // Find the form configuration
-      const form = this.findForm(practiceArea, formCode);
-      if (!form) {
-        throw new Error(`Unknown form: ${formCode} for ${practiceArea}`);
-      }
-
-      // Prepare the data payload
-      const payload = this.preparePayload(practiceArea, formCode, clientData);
-
-      // Make the API call
-      const response = await fetch(`${endpoint.baseUrl}${form.endpoint}`, {
+      // Map client data to the format expected by the probate automation app
+      const formData = this.mapClientDataToFormData(client, practiceArea);
+      
+      // Use local Netlify function to avoid CORS issues
+      const response = await fetch('/.netlify/functions/generate-document', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': endpoint.apiKey
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          formType: formCode,
+          data: formData
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`Document generation failed: ${response.statusText}`);
+        const errorData = await response.text();
+        console.error('API Error:', errorData);
+        throw new Error(`Failed to generate document: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      // Check content type of response
+      const contentType = response.headers.get('content-type');
       
-      // Save document reference to local storage
-      this.saveDocumentRecord({
-        clientId: clientData.id,
-        formCode,
-        practiceArea,
-        generatedAt: new Date().toISOString(),
-        documentUrl: result.documentUrl,
-        status: 'generated'
-      });
-
-      return result;
+      if (contentType && contentType.includes('application/pdf')) {
+        // Direct PDF response
+        const pdfBlob = await response.blob();
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        
+        // Store in history
+        this.addToHistory(client.id, formCode, 'generated', pdfUrl);
+        
+        // Download the PDF
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = `${formCode}_${client.name.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+        link.click();
+        
+        return {
+          success: true,
+          documentUrl: pdfUrl,
+          formCode: formCode
+        };
+      } else {
+        // JSON response (batch generation)
+        const result = await response.json();
+        
+        if (result.success && result.pdfs && result.pdfs[formCode]) {
+          // Convert base64 to blob
+          const base64 = result.pdfs[formCode];
+          const byteCharacters = atob(base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          
+          // Create URL for the PDF
+          const pdfUrl = URL.createObjectURL(blob);
+          
+          // Store in history
+          this.addToHistory(client.id, formCode, 'generated', pdfUrl);
+          
+          // Download the PDF
+          const link = document.createElement('a');
+          link.href = pdfUrl;
+          link.download = `${formCode}_${client.name.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+          link.click();
+          
+          return {
+            success: true,
+            documentUrl: pdfUrl,
+            formCode: formCode
+          };
+        } else {
+          throw new Error(result.error || 'Failed to generate document');
+        }
+      }
     } catch (error) {
-      console.error('Document generation error:', error);
+      console.error('Error generating document:', error);
+      
+      // Store error in history
+      this.addToHistory(client.id, formCode, 'error');
+      
       throw error;
     }
   }
 
-  /**
-   * Generate multiple documents in batch
-   */
-  async generateBatch(practiceArea, formCodes, clientData) {
+  // Generate multiple documents for a workflow stage
+  async generateWorkflowDocuments(practiceArea, stage, client) {
+    const forms = this.getAvailableForms(practiceArea)[stage] || [];
     const results = [];
     const errors = [];
 
-    for (const formCode of formCodes) {
+    for (const form of forms) {
       try {
-        const result = await this.generateDocument(practiceArea, formCode, clientData);
-        results.push({ formCode, success: true, ...result });
+        const result = await this.generateDocument(practiceArea, form.code, client);
+        results.push(result);
       } catch (error) {
-        errors.push({ formCode, success: false, error: error.message });
+        errors.push({
+          formCode: form.code,
+          error: error.message
+        });
       }
     }
 
     return { results, errors };
   }
 
-  /**
-   * Generate all documents for a workflow stage
-   */
-  async generateWorkflowDocuments(practiceArea, stage, clientData) {
-    const forms = this.formMappings[practiceArea][stage];
-    if (!forms) {
-      throw new Error(`Unknown workflow stage: ${stage} for ${practiceArea}`);
+  // Add to document history
+  addToHistory(clientId, formCode, status, documentUrl = null) {
+    if (!this.documentHistory[clientId]) {
+      this.documentHistory[clientId] = [];
     }
 
-    const formCodes = forms.map(f => f.code);
-    return this.generateBatch(practiceArea, formCodes, clientData);
-  }
-
-  /**
-   * Prepare payload based on practice area
-   */
-  preparePayload(practiceArea, formCode, clientData) {
-    const basePayload = {
-      clientInfo: {
-        name: clientData.name,
-        email: clientData.email,
-        phone: clientData.phone,
-        address: clientData.address,
-        caseNumber: clientData.caseNumber
-      },
+    this.documentHistory[clientId].push({
       formCode,
-      generatedBy: localStorage.getItem('userName') || 'Staff',
+      status,
+      documentUrl,
       generatedAt: new Date().toISOString()
-    };
+    });
 
-    // Add practice-area specific data
-    switch (practiceArea) {
-      case 'probate':
-        return {
-          ...basePayload,
-          decedentInfo: {
-            name: clientData.decedentName,
-            dateOfDeath: clientData.dateOfDeath,
-            placeOfDeath: clientData.placeOfDeath
-          },
-          estateInfo: {
-            value: clientData.estateValue,
-            hasWill: clientData.hasWill,
-            willDate: clientData.willDate
-          },
-          petitionerInfo: {
-            name: clientData.petitionerName,
-            relationship: clientData.relationship,
-            priority: clientData.priority
-          }
-        };
-
-      case 'conservatorship':
-        return {
-          ...basePayload,
-          conservateeInfo: {
-            name: clientData.conservateeName,
-            dateOfBirth: clientData.conservateeDOB,
-            address: clientData.conservateeAddress
-          },
-          proposedConservator: {
-            name: clientData.conservatorName,
-            relationship: clientData.conservatorRelationship,
-            address: clientData.conservatorAddress
-          },
-          typeOfConservatorship: clientData.conservatorshipType,
-          reasonsForConservatorship: clientData.reasons,
-          hasCapacityDeclaration: clientData.hasCapacityDeclaration
-        };
-
-      case 'guardianship':
-        return {
-          ...basePayload,
-          minorInfo: {
-            names: clientData.minorNames || [],
-            birthdates: clientData.minorBirthdates || [],
-            currentAddress: clientData.minorAddress
-          },
-          proposedGuardian: {
-            name: clientData.guardianName,
-            relationship: clientData.guardianRelationship,
-            address: clientData.guardianAddress
-          },
-          parents: {
-            mother: clientData.motherInfo,
-            father: clientData.fatherInfo
-          },
-          guardianshipType: clientData.guardianshipType
-        };
-
-      case 'trust':
-        return {
-          ...basePayload,
-          trustInfo: {
-            name: clientData.trustName,
-            date: clientData.trustDate,
-            trustor: clientData.trustorName,
-            trustee: clientData.trusteeName
-          },
-          amendmentInfo: {
-            number: clientData.amendmentNumber,
-            changes: clientData.changes
-          }
-        };
-
-      default:
-        return basePayload;
-    }
+    // Save to localStorage
+    localStorage.setItem('documentHistory', JSON.stringify(this.documentHistory));
   }
 
-  /**
-   * Find form configuration
-   */
-  findForm(practiceArea, formCode) {
-    const areas = this.formMappings[practiceArea];
-    if (!areas) return null;
-
-    for (const stage of Object.values(areas)) {
-      const form = stage.find(f => f.code === formCode);
-      if (form) return form;
-    }
-    return null;
-  }
-
-  /**
-   * Save document record to local storage
-   */
-  saveDocumentRecord(record) {
-    const key = `doc_${record.clientId}_${Date.now()}`;
-    const documents = JSON.parse(localStorage.getItem('generatedDocuments') || '{}');
-    documents[key] = record;
-    localStorage.setItem('generatedDocuments', JSON.stringify(documents));
-  }
-
-  /**
-   * Get document history for a client
-   */
+  // Get document history for a client
   getClientDocumentHistory(clientId) {
-    const documents = JSON.parse(localStorage.getItem('generatedDocuments') || '{}');
-    return Object.values(documents)
-      .filter(doc => doc.clientId === clientId)
-      .sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
+    return this.documentHistory[clientId] || [];
   }
 
-  /**
-   * Check document app availability
-   */
-  async checkAppStatus(practiceArea) {
-    try {
-      const endpoint = this.endpoints[practiceArea];
-      const response = await fetch(`${endpoint.baseUrl}/api/health`, {
-        method: 'GET',
-        headers: {
-          'X-API-Key': endpoint.apiKey
-        }
-      });
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Get available forms for a practice area
-   */
-  getAvailableForms(practiceArea) {
-    return this.formMappings[practiceArea] || {};
+  // Clear history for a client
+  clearClientHistory(clientId) {
+    delete this.documentHistory[clientId];
+    localStorage.setItem('documentHistory', JSON.stringify(this.documentHistory));
   }
 }
 
-export default new DocumentAutomationService();
+// Export as singleton
+const documentService = new DocumentAutomationService();
+export default documentService;

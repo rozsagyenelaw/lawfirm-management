@@ -1,15 +1,34 @@
 // DocumentAutomationService.js
-// Service for integrating with the Probate Form Automation API
+// Service for integrating with the Probate Form Automation API and Guardianship/Conservatorship API
 
 class DocumentAutomationService {
   constructor() {
-    // Use your actual probate automation app URL
-    this.baseUrl = 'https://probateformautomation.netlify.app/.netlify/functions';
+    // API endpoints for different practice areas
+    this.endpoints = {
+      probate: 'https://probateformautomation.netlify.app/.netlify/functions',
+      guardianship: 'https://guardianshipconservatorsh.netlify.app/.netlify/functions',
+      conservatorship: 'https://guardianshipconservatorsh.netlify.app/.netlify/functions'
+    };
+    
     this.documentHistory = JSON.parse(localStorage.getItem('documentHistory') || '{}');
   }
 
-  // Map law firm client data to probate app format
+  // Map law firm client data to appropriate format based on practice area
   mapClientDataToFormData(client, practiceArea) {
+    switch(practiceArea) {
+      case 'probate':
+        return this.mapClientDataToProbateFormat(client);
+      case 'guardianship':
+        return this.mapClientDataToGuardianshipFormat(client);
+      case 'conservatorship':
+        return this.mapClientDataToConservatorshipFormat(client);
+      default:
+        return client;
+    }
+  }
+
+  // Map law firm client data to probate app format (EXISTING METHOD - UNCHANGED)
+  mapClientDataToProbateFormat(client) {
     // Format heirs list as expected by the probate automation app
     const formatHeirsList = () => {
       if (!client.heirs || client.heirs.length === 0) return '';
@@ -78,54 +97,182 @@ class DocumentAutomationService {
     return baseData;
   }
 
-  // Get available forms for probate
-  getAvailableForms(practiceArea) {
-    if (practiceArea !== 'probate') {
-      return {};
+  // Map law firm client data to guardianship app format (NEW METHOD)
+  mapClientDataToGuardianshipFormat(client) {
+    // If we have guardianshipData stored from the form, use it directly
+    if (client.guardianshipData) {
+      return {
+        ...client.guardianshipData,
+        // Ensure attorney info is always included
+        attorney_name: client.guardianshipData.attorney_name || "ROZSA GYENE, ESQ.",
+        attorney_bar: client.guardianshipData.attorney_bar || "208356",
+        firm_name: client.guardianshipData.firm_name || "LAW OFFICES OF ROZSA GYENE",
+        firm_street: client.guardianshipData.firm_street || "450 N BRAND BLVD SUITE 600",
+        firm_city: client.guardianshipData.firm_city || "GLENDALE",
+        firm_state: client.guardianshipData.firm_state || "CA",
+        firm_zip: client.guardianshipData.firm_zip || "91203",
+        firm_phone: client.guardianshipData.firm_phone || "818-291-6217",
+        firm_email: client.guardianshipData.firm_email || "ROZSAGYENELAW@YAHOO.COM"
+      };
     }
 
+    // Fallback mapping if no guardianshipData exists
     return {
-      initial: [
-        { code: 'DE-111', name: 'Petition for Probate' },
-        { code: 'DE-121', name: 'Notice of Petition to Administer Estate' },
-        { code: 'DE-122', name: 'Citation - Probate' },
-        { code: 'DE-131', name: 'Proof of Subscribing Witness' },
-        { code: 'DE-135', name: 'Proof of Holographic Instrument' },
-      ],
-      administration: [
-        { code: 'DE-140', name: 'Order for Probate' },
-        { code: 'DE-147', name: 'Duties and Liabilities of Personal Representative' },
-        { code: 'DE-150', name: 'Letters Testamentary/Administration' },
-        { code: 'DE-157', name: 'Notice of Administration to Creditors' },
-      ],
-      inventory: [
-        { code: 'DE-160', name: 'Inventory and Appraisal' },
-        { code: 'DE-161', name: 'Inventory and Appraisal Attachment' },
-      ],
-      accounting: [
-        { code: 'DE-172', name: 'Notice of Administration' },
-        { code: 'DE-174', name: 'Allowance or Rejection of Creditors Claim' },
-        { code: 'DE-260', name: 'Petition for Final Distribution' },
-        { code: 'DE-270', name: 'Ex Parte Petition for Final Discharge' },
-      ]
+      form_type: 'guardianship',
+      petitioner_name: client.name || '',
+      petitioner_relationship: client.relationship || '',
+      petitioner_address: client.address || '',
+      petitioner_phone: client.phone || '',
+      guardian_name: client.guardianName || client.name || '',
+      guardian_address: client.guardianAddress || client.address || '',
+      guardian_phone: client.guardianPhone || client.phone || '',
+      minors_list: client.minors_list || '',
+      guardianship_type: client.guardianshipType || 'person',
+      court_county: client.courtCounty || 'LOS ANGELES',
+      court_branch: client.courtBranch || 'STANLEY MOSK COURTHOUSE',
+      attorney_name: "ROZSA GYENE, ESQ.",
+      attorney_bar: "208356",
+      firm_name: "LAW OFFICES OF ROZSA GYENE",
+      firm_street: "450 N BRAND BLVD SUITE 600",
+      firm_city: "GLENDALE",
+      firm_state: "CA",
+      firm_zip: "91203",
+      firm_phone: "818-291-6217",
+      firm_email: "ROZSAGYENELAW@YAHOO.COM"
     };
   }
 
-  // Generate a single document
+  // Map law firm client data to conservatorship app format (NEW METHOD)
+  mapClientDataToConservatorshipFormat(client) {
+    // If we have conservatorshipData stored from the form, use it directly
+    if (client.conservatorshipData) {
+      return {
+        ...client.conservatorshipData,
+        // Ensure attorney info is always included
+        attorney_name: client.conservatorshipData.attorney_name || "ROZSA GYENE, ESQ.",
+        attorney_bar: client.conservatorshipData.attorney_bar || "208356",
+        firm_name: client.conservatorshipData.firm_name || "LAW OFFICES OF ROZSA GYENE",
+        firm_street: client.conservatorshipData.firm_street || "450 N BRAND BLVD SUITE 600",
+        firm_city: client.conservatorshipData.firm_city || "GLENDALE",
+        firm_state: client.conservatorshipData.firm_state || "CA",
+        firm_zip: client.conservatorshipData.firm_zip || "91203",
+        firm_phone: client.conservatorshipData.firm_phone || "818-291-6217",
+        firm_email: client.conservatorshipData.firm_email || "ROZSAGYENELAW@YAHOO.COM"
+      };
+    }
+
+    // Fallback mapping if no conservatorshipData exists
+    return {
+      form_type: 'conservatorship',
+      cons_petitioner_name: client.name || '',
+      cons_petitioner_relationship: client.relationship || '',
+      cons_petitioner_address: client.address || '',
+      cons_petitioner_phone: client.phone || '',
+      conservatee_name: client.conservateeName || '',
+      conservator_name: client.conservatorName || client.name || '',
+      conservator_address: client.conservatorAddress || client.address || '',
+      conservator_phone: client.conservatorPhone || client.phone || '',
+      conservatorship_type: client.conservatorshipType || 'person',
+      court_county: client.courtCounty || 'LOS ANGELES',
+      court_branch: client.courtBranch || 'STANLEY MOSK COURTHOUSE',
+      attorney_name: "ROZSA GYENE, ESQ.",
+      attorney_bar: "208356",
+      firm_name: "LAW OFFICES OF ROZSA GYENE",
+      firm_street: "450 N BRAND BLVD SUITE 600",
+      firm_city: "GLENDALE",
+      firm_state: "CA",
+      firm_zip: "91203",
+      firm_phone: "818-291-6217",
+      firm_email: "ROZSAGYENELAW@YAHOO.COM"
+    };
+  }
+
+  // Get available forms for practice area (UPDATED METHOD)
+  getAvailableForms(practiceArea) {
+    const forms = {
+      probate: {
+        initial: [
+          { code: 'DE-111', name: 'Petition for Probate' },
+          { code: 'DE-121', name: 'Notice of Petition to Administer Estate' },
+          { code: 'DE-122', name: 'Citation - Probate' },
+          { code: 'DE-131', name: 'Proof of Subscribing Witness' },
+          { code: 'DE-135', name: 'Proof of Holographic Instrument' },
+        ],
+        administration: [
+          { code: 'DE-140', name: 'Order for Probate' },
+          { code: 'DE-147', name: 'Duties and Liabilities of Personal Representative' },
+          { code: 'DE-150', name: 'Letters Testamentary/Administration' },
+          { code: 'DE-157', name: 'Notice of Administration to Creditors' },
+        ],
+        inventory: [
+          { code: 'DE-160', name: 'Inventory and Appraisal' },
+          { code: 'DE-161', name: 'Inventory and Appraisal Attachment' },
+        ],
+        accounting: [
+          { code: 'DE-172', name: 'Notice of Administration' },
+          { code: 'DE-174', name: 'Allowance or Rejection of Creditors Claim' },
+          { code: 'DE-260', name: 'Petition for Final Distribution' },
+          { code: 'DE-270', name: 'Ex Parte Petition for Final Discharge' },
+        ]
+      },
+      guardianship: {
+        initial: [
+          { code: 'GC-210', name: 'Petition for Guardianship' },
+          { code: 'GC-212', name: 'Confidential Screening Form' },
+          { code: 'GC-210(CA)', name: 'Confidential Guardian Assessment' }
+        ],
+        appointment: [
+          { code: 'GC-240', name: 'Order Appointing Guardian' },
+          { code: 'GC-250', name: 'Letters of Guardianship' }
+        ],
+        annual: [
+          { code: 'GC-251', name: 'Annual Status Report' }
+        ]
+      },
+      conservatorship: {
+        initial: [
+          { code: 'GC-310', name: 'Petition for Conservatorship' },
+          { code: 'GC-312', name: 'Confidential Supplemental Information' },
+          { code: 'GC-314', name: 'Confidential Conservator Screening Form' },
+          { code: 'GC-320', name: 'Citation for Conservatorship' }
+        ],
+        appointment: [
+          { code: 'GC-340', name: 'Order Appointing Conservator' },
+          { code: 'GC-350', name: 'Letters of Conservatorship' }
+        ],
+        accounting: [
+          { code: 'GC-355', name: 'Inventory and Appraisal' },
+          { code: 'GC-405', name: 'Account of Conservator' }
+        ]
+      }
+    };
+
+    return forms[practiceArea] || {};
+  }
+
+  // Generate a single document (UPDATED METHOD)
   async generateDocument(practiceArea, formCode, client) {
     try {
-      // Map client data to the format expected by the probate automation app
+      // Map client data to the format expected by the appropriate automation app
       const formData = this.mapClientDataToFormData(client, practiceArea);
       
-      // Use local Netlify function to avoid CORS issues
-      const response = await fetch('/.netlify/functions/generate-document', {
+      // Determine which Netlify function to use based on practice area
+      let functionEndpoint = '/.netlify/functions/generate-document'; // Default for probate
+      
+      if (practiceArea === 'guardianship' || practiceArea === 'conservatorship') {
+        functionEndpoint = '/.netlify/functions/generate-gc-document';
+      }
+      
+      // Make the request
+      const response = await fetch(functionEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           formType: formCode,
-          data: formData
+          data: formData,
+          caseType: practiceArea // Add this for GC forms
         })
       });
 
@@ -203,7 +350,7 @@ class DocumentAutomationService {
     }
   }
 
-  // Generate multiple documents for a workflow stage
+  // Generate multiple documents for a workflow stage (EXISTING METHOD - UNCHANGED)
   async generateWorkflowDocuments(practiceArea, stage, client) {
     const forms = this.getAvailableForms(practiceArea)[stage] || [];
     const results = [];
@@ -224,7 +371,7 @@ class DocumentAutomationService {
     return { results, errors };
   }
 
-  // Add to document history
+  // Add to document history (EXISTING METHOD - UNCHANGED)
   addToHistory(clientId, formCode, status, documentUrl = null) {
     if (!this.documentHistory[clientId]) {
       this.documentHistory[clientId] = [];
@@ -241,12 +388,12 @@ class DocumentAutomationService {
     localStorage.setItem('documentHistory', JSON.stringify(this.documentHistory));
   }
 
-  // Get document history for a client
+  // Get document history for a client (EXISTING METHOD - UNCHANGED)
   getClientDocumentHistory(clientId) {
     return this.documentHistory[clientId] || [];
   }
 
-  // Clear history for a client
+  // Clear history for a client (EXISTING METHOD - UNCHANGED)
   clearClientHistory(clientId) {
     delete this.documentHistory[clientId];
     localStorage.setItem('documentHistory', JSON.stringify(this.documentHistory));

@@ -9,6 +9,7 @@ import PaymentManager from '../components/PaymentManager';
 import FormsTracker from '../components/FormsTracker';
 import DamageCalculator from '../components/DamageCalculator';
 import DocumentGenerationPanel from '../components/DocumentGenerationPanel';
+import ProbateDataForm from '../components/ProbateDataForm';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -27,7 +28,7 @@ const ClientDetail = () => {
     addEvent
   } = useData();
   
-  const client = clients.find(c => c.id === id);
+  const [client, setClient] = useState(clients.find(c => c.id === id));
   const [activeTab, setActiveTab] = useState('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(client || {});
@@ -69,6 +70,7 @@ const ClientDetail = () => {
 
   const handleUpdate = () => {
     updateClient(id, editData);
+    setClient(editData);
     setIsEditing(false);
   };
 
@@ -77,6 +79,13 @@ const ClientDetail = () => {
       deleteClient(id);
       navigate('/clients');
     }
+  };
+
+  const handleProbateDataSave = (updatedClient) => {
+    // Update local state
+    setClient(updatedClient);
+    // Update in context/database
+    updateClient(id, updatedClient);
   };
 
   const handleAddTask = () => {
@@ -270,6 +279,15 @@ const ClientDetail = () => {
               onClick={() => setActiveTab('forms')}
             >
               Forms
+            </button>
+          )}
+          {client.category === 'probate' && (
+            <button 
+              className={`tab ${activeTab === 'probate-data' ? 'active' : ''}`}
+              onClick={() => setActiveTab('probate-data')}
+            >
+              <FileText size={16} />
+              Probate Info
             </button>
           )}
           {shouldShowDocumentGeneration() && (
@@ -501,9 +519,31 @@ const ClientDetail = () => {
             </div>
           )}
 
+          {activeTab === 'probate-data' && client.category === 'probate' && (
+            <div className="section-content">
+              <ProbateDataForm 
+                client={client} 
+                onSave={handleProbateDataSave}
+              />
+            </div>
+          )}
+
           {activeTab === 'generate' && shouldShowDocumentGeneration() && (
             <div className="section-content">
-              <DocumentGenerationPanel client={getClientDataForDocumentGeneration()} />
+              {client.category === 'probate' && !client.decedentName ? (
+                <div className="empty-state">
+                  <FileText size={48} />
+                  <p>Please fill out the Probate Info first before generating documents</p>
+                  <button 
+                    className="btn-primary mt-4"
+                    onClick={() => setActiveTab('probate-data')}
+                  >
+                    Go to Probate Info
+                  </button>
+                </div>
+              ) : (
+                <DocumentGenerationPanel client={getClientDataForDocumentGeneration()} />
+              )}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard, Flame } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard, Flame, FileSignature } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import DocumentUpload from '../components/DocumentUpload';
@@ -8,6 +8,7 @@ import InvoiceGenerator from '../components/InvoiceGenerator';
 import PaymentManager from '../components/PaymentManager';
 import FormsTracker from '../components/FormsTracker';
 import DamageCalculator from '../components/DamageCalculator';
+import DocumentGenerationPanel from '../components/DocumentGenerationPanel';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -129,6 +130,34 @@ const ClientDetail = () => {
     'fire-victim': 'Fire Victim'
   };
 
+  // Check if document generation should be available for this client category
+  const shouldShowDocumentGeneration = () => {
+    const supportedCategories = ['probate', 'conservatorship', 'guardianship', 'estate-planning'];
+    return supportedCategories.includes(client.category);
+  };
+
+  // Prepare client data for document generation with the correct case type format
+  const getClientDataForDocumentGeneration = () => {
+    const caseTypeMapping = {
+      'estate-planning': 'trust',
+      'probate': 'probate',
+      'conservatorship': 'conservatorship',
+      'guardianship': 'guardianship'
+    };
+
+    return {
+      ...client,
+      caseType: caseTypeMapping[client.category] || client.category,
+      petitionerName: client.name,
+      conservatorName: client.name,
+      guardianName: client.name,
+      trustorName: client.name,
+      caseNumber: client.caseNumber || '',
+      createdAt: client.createdAt,
+      updatedAt: client.updatedAt
+    };
+  };
+
   return (
     <div className="client-detail">
       <div className="page-header">
@@ -241,6 +270,15 @@ const ClientDetail = () => {
               onClick={() => setActiveTab('forms')}
             >
               Forms
+            </button>
+          )}
+          {shouldShowDocumentGeneration() && (
+            <button 
+              className={`tab ${activeTab === 'generate' ? 'active' : ''}`}
+              onClick={() => setActiveTab('generate')}
+            >
+              <FileSignature size={16} />
+              Generate
             </button>
           )}
           {client.category === 'fire-victim' && (
@@ -460,6 +498,12 @@ const ClientDetail = () => {
                   <p>Forms tracking is not available for {categories[client.category]}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'generate' && shouldShowDocumentGeneration() && (
+            <div className="section-content">
+              <DocumentGenerationPanel client={getClientDataForDocumentGeneration()} />
             </div>
           )}
 

@@ -22,6 +22,7 @@ const ProbateDataForm = ({ client, onSave }) => {
     petitionerRelationship: '',
     petitionerAddress: client?.address || '',
     petitionerPhone: client?.phone || '',
+    petitionerEmail: client?.email || '',
     petitionerIsExecutor: 'no',
     
     // Estate Information
@@ -32,18 +33,30 @@ const ProbateDataForm = ({ client, onSave }) => {
     willDate: '',
     willSelfProving: 'no',
     executorNamedInWill: 'no',
+    estateValue: '',
     
-    // Heirs
-    heirs: [],
+    // Case Information
+    caseNumber: '',
+    hearingDept: '',
+    hearingDate: '',
+    hearingTime: '',
     
-    // Administration Details
+    // Administration
+    bondWaived: false,
+    independentAdmin: false,
     adminType: 'full',
     bondRequired: 'no',
     bondAmount: '',
     
     // Court Information
     courtCounty: 'LOS ANGELES',
-    courtBranch: 'STANLEY MOSK COURTHOUSE'
+    courtBranch: 'STANLEY MOSK COURTHOUSE',
+    
+    // Arrays
+    heirs: [],
+    realProperty: [],
+    personalProperty: [],
+    debts: []
   });
 
   const [newHeir, setNewHeir] = useState({ 
@@ -51,6 +64,18 @@ const ProbateDataForm = ({ client, onSave }) => {
     relationship: '', 
     age: '', 
     address: '' 
+  });
+
+  const [newAsset, setNewAsset] = useState({ 
+    description: '', 
+    value: '', 
+    type: 'real' 
+  });
+  
+  const [newDebt, setNewDebt] = useState({ 
+    creditor: '', 
+    amount: '', 
+    description: '' 
   });
 
   // Load saved data from localStorage if exists
@@ -109,10 +134,52 @@ const ProbateDataForm = ({ client, onSave }) => {
     }));
   };
 
+  // Asset management
+  const addAsset = () => {
+    if (newAsset.description && newAsset.value) {
+      const assetList = newAsset.type === 'real' ? 'realProperty' : 'personalProperty';
+      setFormData(prev => ({
+        ...prev,
+        [assetList]: [...prev[assetList], { ...newAsset, id: Date.now() }]
+      }));
+      setNewAsset({ description: '', value: '', type: 'real' });
+    }
+  };
+
+  const removeAsset = (id, type) => {
+    const assetList = type === 'real' ? 'realProperty' : 'personalProperty';
+    setFormData(prev => ({
+      ...prev,
+      [assetList]: prev[assetList].filter(a => a.id !== id)
+    }));
+  };
+
+  // Debt management
+  const addDebt = () => {
+    if (newDebt.creditor && newDebt.amount) {
+      setFormData(prev => ({
+        ...prev,
+        debts: [...prev.debts, { ...newDebt, id: Date.now() }]
+      }));
+      setNewDebt({ creditor: '', amount: '', description: '' });
+    }
+  };
+
+  const removeDebt = (id) => {
+    setFormData(prev => ({
+      ...prev,
+      debts: prev.debts.filter(d => d.id !== id)
+    }));
+  };
+
   const formatCurrency = (value) => {
     if (!value) return '';
     const num = parseFloat(value.toString().replace(/[^0-9.-]+/g, ''));
-    return isNaN(num) ? '' : num.toString();
+    return isNaN(num) ? '' : new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0
+    }).format(num);
   };
 
   return (
@@ -156,7 +223,7 @@ const ProbateDataForm = ({ client, onSave }) => {
             </label>
             <input
               type="date"
-              name="dateOfDeath"
+              name="dateOfDeath" 
               value={formData.dateOfDeath}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -628,139 +695,13 @@ const ProbateDataForm = ({ client, onSave }) => {
         </div>
       </div>
 
-      {/* Save Button */}
-      <div className="flex justify-end mt-8">
-        <button
-          onClick={handleSave}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium"
-        >
-          <Save size={20} />
-          Save Probate Information
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default ProbateDataForm;
-
-  // Load saved data from localStorage if exists
-  useEffect(() => {
-    if (client?.id) {
-      const savedData = localStorage.getItem(`probate_data_${client.id}`);
-      if (savedData) {
-        setFormData(JSON.parse(savedData));
-      }
-    }
-  }, [client]);
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSave = () => {
-    // Save to localStorage
-    if (client?.id) {
-      localStorage.setItem(`probate_data_${client.id}`, JSON.stringify(formData));
-    }
-    
-    // Call parent save handler
-    if (onSave) {
-      onSave(formData);
-    }
-    
-    toast.success('Probate data saved successfully!');
-  };
-
-  // Heir management
-  const addHeir = () => {
-    if (newHeir.name) {
-      setFormData(prev => ({
-        ...prev,
-        heirs: [...prev.heirs, { ...newHeir, id: Date.now() }]
-      }));
-      setNewHeir({ name: '', relationship: '', address: '' });
-    }
-  };
-
-  const removeHeir = (id) => {
-    setFormData(prev => ({
-      ...prev,
-      heirs: prev.heirs.filter(h => h.id !== id)
-    }));
-  };
-
-  // Asset management
-  const addAsset = () => {
-    if (newAsset.description && newAsset.value) {
-      const assetList = newAsset.type === 'real' ? 'realProperty' : 'personalProperty';
-      setFormData(prev => ({
-        ...prev,
-        [assetList]: [...prev[assetList], { ...newAsset, id: Date.now() }]
-      }));
-      setNewAsset({ description: '', value: '', type: 'real' });
-    }
-  };
-
-  const removeAsset = (id, type) => {
-    const assetList = type === 'real' ? 'realProperty' : 'personalProperty';
-    setFormData(prev => ({
-      ...prev,
-      [assetList]: prev[assetList].filter(a => a.id !== id)
-    }));
-  };
-
-  // Debt management
-  const addDebt = () => {
-    if (newDebt.creditor && newDebt.amount) {
-      setFormData(prev => ({
-        ...prev,
-        debts: [...prev.debts, { ...newDebt, id: Date.now() }]
-      }));
-      setNewDebt({ creditor: '', amount: '', description: '' });
-    }
-  };
-
-  const removeDebt = (id) => {
-    setFormData(prev => ({
-      ...prev,
-      debts: prev.debts.filter(d => d.id !== id)
-    }));
-  };
-
-  const formatCurrency = (value) => {
-    const num = parseFloat(value.replace(/[^0-9.-]+/g, ''));
-    return isNaN(num) ? '' : new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(num);
-  };
-
-  return (
-    <div className="probate-data-form bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Probate Information Form
-        </h3>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Save size={18} />
-          Save Data
-        </button>
-      </div>
-
-      {/* Decedent Information */}
+      {/* ALTERNATIVE SECTIONS - Lines 806-1210 from your original */}
+      
+      {/* Alternative Decedent Information */}
       <div className="section mb-6">
         <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
           <User size={18} />
-          Decedent Information
+          Decedent Information (Simplified)
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -804,11 +745,11 @@ export default ProbateDataForm;
         </div>
       </div>
 
-      {/* Petitioner Information */}
+      {/* Alternative Petitioner Information */}
       <div className="section mb-6">
         <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
           <User size={18} />
-          Petitioner Information
+          Petitioner Information (Extended)
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -933,11 +874,11 @@ export default ProbateDataForm;
         </div>
       </div>
 
-      {/* Estate Information */}
+      {/* Alternative Estate Information */}
       <div className="section mb-6">
         <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
           <DollarSign size={18} />
-          Estate Information
+          Estate Information (Summary)
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -1001,11 +942,11 @@ export default ProbateDataForm;
         </div>
       </div>
 
-      {/* Heirs and Beneficiaries */}
+      {/* Alternative Heirs and Beneficiaries - with only 3 columns */}
       <div className="section mb-6">
         <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
           <Users size={18} />
-          Heirs and Beneficiaries
+          Heirs and Beneficiaries (Simple)
         </h4>
         
         <div className="space-y-2 mb-4">

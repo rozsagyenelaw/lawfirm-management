@@ -1000,6 +1000,7 @@ function getFormsLibrary() {
           name: 'Initial Filing',
           daysFromStart: 0,
           forms: [
+            { code: 'DE-111', name: 'Petition for Probate', required: true }, 
             { code: 'PR-010', name: 'Cover Sheet', required: true },
             { code: 'DE-147', name: 'Duties and Liabilities of Personal Representative', required: true },
             { code: 'DE-147S', name: 'Supplement to DE-147', required: true }
@@ -1120,3 +1121,4 @@ function getFormsLibrary() {
     }
   };
 }
+

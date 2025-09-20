@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard, Flame, FileSignature } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Edit, Trash2, Plus, FileText, CheckSquare, Clock, DollarSign, CreditCard, Flame, FileSignature, Shield, Users } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import DocumentUpload from '../components/DocumentUpload';
@@ -10,6 +10,8 @@ import FormsTracker from '../components/FormsTracker';
 import DamageCalculator from '../components/DamageCalculator';
 import DocumentGenerationPanel from '../components/DocumentGenerationPanel';
 import ProbateDataForm from '../components/ProbateDataForm';
+import GuardianshipDataForm from '../components/GuardianshipDataForm';
+import ConservatorshipDataForm from '../components/ConservatorshipDataForm';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -88,6 +90,40 @@ const ClientDetail = () => {
     updateClient(id, updatedClient);
   };
 
+  const handleGuardianshipDataSave = (formData) => {
+    // Update client with guardianship data
+    const updatedClient = {
+      ...client,
+      guardianshipData: formData,
+      // Store key fields at the client level for easier access
+      petitionerName: formData.petitioner_name,
+      guardianName: formData.guardian_name,
+      minors: formData.minors,
+      guardianshipType: formData.guardianship_type,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    setClient(updatedClient);
+    updateClient(id, updatedClient);
+  };
+
+  const handleConservatorshipDataSave = (formData) => {
+    // Update client with conservatorship data
+    const updatedClient = {
+      ...client,
+      conservatorshipData: formData,
+      // Store key fields at the client level for easier access
+      petitionerName: formData.cons_petitioner_name,
+      conservatorName: formData.conservator_name,
+      conservateeName: formData.conservatee_name,
+      conservatorshipType: formData.conservatorship_type,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    setClient(updatedClient);
+    updateClient(id, updatedClient);
+  };
+
   const handleAddTask = () => {
     const taskTitle = prompt('Enter task title:');
     if (taskTitle) {
@@ -145,6 +181,48 @@ const ClientDetail = () => {
     return supportedCategories.includes(client.category);
   };
 
+  // Check if required data is filled for document generation
+  const hasRequiredDataForGeneration = () => {
+    switch(client.category) {
+      case 'probate':
+        return client.decedentName ? true : false;
+      case 'guardianship':
+        return client.guardianshipData && client.guardianshipData.guardian_name ? true : false;
+      case 'conservatorship':
+        return client.conservatorshipData && client.conservatorshipData.conservatee_name ? true : false;
+      case 'estate-planning':
+        return true; // Estate planning might not need specific data
+      default:
+        return false;
+    }
+  };
+
+  // Get the appropriate data form tab name
+  const getDataFormTabName = () => {
+    switch(client.category) {
+      case 'probate':
+        return 'Probate Info';
+      case 'guardianship':
+        return 'Guardianship Info';
+      case 'conservatorship':
+        return 'Conservatorship Info';
+      default:
+        return 'Case Info';
+    }
+  };
+
+  // Get the appropriate icon for the data form tab
+  const getDataFormIcon = () => {
+    switch(client.category) {
+      case 'guardianship':
+        return <Users size={16} />;
+      case 'conservatorship':
+        return <Shield size={16} />;
+      default:
+        return <FileText size={16} />;
+    }
+  };
+
   // Prepare client data for document generation with the correct case type format
   const getClientDataForDocumentGeneration = () => {
     const caseTypeMapping = {
@@ -154,17 +232,40 @@ const ClientDetail = () => {
       'guardianship': 'guardianship'
     };
 
-    return {
+    let baseData = {
       ...client,
       caseType: caseTypeMapping[client.category] || client.category,
-      petitionerName: client.name,
-      conservatorName: client.name,
-      guardianName: client.name,
-      trustorName: client.name,
       caseNumber: client.caseNumber || '',
       createdAt: client.createdAt,
       updatedAt: client.updatedAt
     };
+
+    // Add category-specific data
+    switch(client.category) {
+      case 'probate':
+        return {
+          ...baseData,
+          petitionerName: client.name,
+          trustorName: client.name
+        };
+      case 'guardianship':
+        return {
+          ...baseData,
+          ...client.guardianshipData,
+          petitionerName: client.guardianshipData?.petitioner_name || client.name,
+          guardianName: client.guardianshipData?.guardian_name || client.name
+        };
+      case 'conservatorship':
+        return {
+          ...baseData,
+          ...client.conservatorshipData,
+          petitionerName: client.conservatorshipData?.cons_petitioner_name || client.name,
+          conservatorName: client.conservatorshipData?.conservator_name || client.name,
+          conservateeName: client.conservatorshipData?.conservatee_name || ''
+        };
+      default:
+        return baseData;
+    }
   };
 
   return (
@@ -211,6 +312,16 @@ const ClientDetail = () => {
                 <span className={`category-badge ${client.category}`}>
                   {categories[client.category]}
                 </span>
+                {client.guardianshipData?.minors && (
+                  <span className="info-badge">
+                    {client.guardianshipData.minors.length} Minor(s)
+                  </span>
+                )}
+                {client.conservatorshipData?.conservatee_name && (
+                  <span className="info-badge">
+                    Conservatee: {client.conservatorshipData.conservatee_name}
+                  </span>
+                )}
               </>
             ) : (
               <>
@@ -288,6 +399,24 @@ const ClientDetail = () => {
             >
               <FileText size={16} />
               Probate Info
+            </button>
+          )}
+          {client.category === 'guardianship' && (
+            <button 
+              className={`tab ${activeTab === 'guardianship-data' ? 'active' : ''}`}
+              onClick={() => setActiveTab('guardianship-data')}
+            >
+              <Users size={16} />
+              Guardianship Info
+            </button>
+          )}
+          {client.category === 'conservatorship' && (
+            <button 
+              className={`tab ${activeTab === 'conservatorship-data' ? 'active' : ''}`}
+              onClick={() => setActiveTab('conservatorship-data')}
+            >
+              <Shield size={16} />
+              Conservatorship Info
             </button>
           )}
           {shouldShowDocumentGeneration() && (
@@ -399,6 +528,22 @@ const ClientDetail = () => {
                     <CreditCard size={18} />
                     <span>${trustBalance.toFixed(2)} in trust</span>
                   </div>
+                  {client.guardianshipData?.minors && (
+                    <div className="stat-item">
+                      <Users size={18} />
+                      <span>{client.guardianshipData.minors.length} minor(s) in guardianship</span>
+                    </div>
+                  )}
+                  {client.conservatorshipData?.conservatorship_type && (
+                    <div className="stat-item">
+                      <Shield size={18} />
+                      <span>
+                        {client.conservatorshipData.conservatorship_type === 'both' 
+                          ? 'Person & Estate' 
+                          : client.conservatorshipData.conservatorship_type} conservatorship
+                      </span>
+                    </div>
+                  )}
                   {damagesSummary && (
                     <>
                       <div className="stat-item">
@@ -528,17 +673,49 @@ const ClientDetail = () => {
             </div>
           )}
 
+          {activeTab === 'guardianship-data' && client.category === 'guardianship' && (
+            <div className="section-content">
+              <GuardianshipDataForm 
+                onSubmit={handleGuardianshipDataSave}
+                initialData={client.guardianshipData}
+              />
+            </div>
+          )}
+
+          {activeTab === 'conservatorship-data' && client.category === 'conservatorship' && (
+            <div className="section-content">
+              <ConservatorshipDataForm 
+                onSubmit={handleConservatorshipDataSave}
+                initialData={client.conservatorshipData}
+              />
+            </div>
+          )}
+
           {activeTab === 'generate' && shouldShowDocumentGeneration() && (
             <div className="section-content">
-              {client.category === 'probate' && !client.decedentName ? (
+              {!hasRequiredDataForGeneration() ? (
                 <div className="empty-state">
                   <FileText size={48} />
-                  <p>Please fill out the Probate Info first before generating documents</p>
+                  <p>Please fill out the {getDataFormTabName()} first before generating documents</p>
                   <button 
                     className="btn-primary mt-4"
-                    onClick={() => setActiveTab('probate-data')}
+                    onClick={() => {
+                      switch(client.category) {
+                        case 'probate':
+                          setActiveTab('probate-data');
+                          break;
+                        case 'guardianship':
+                          setActiveTab('guardianship-data');
+                          break;
+                        case 'conservatorship':
+                          setActiveTab('conservatorship-data');
+                          break;
+                        default:
+                          break;
+                      }
+                    }}
                   >
-                    Go to Probate Info
+                    Go to {getDataFormTabName()}
                   </button>
                 </div>
               ) : (

@@ -508,7 +508,7 @@ const DocumentGenerationPanel = ({ client }) => {
                   </div>
                   {doc.documentUrl && (
                     
-                      href={doc.documentUrl}
+                      <a href={doc.documentUrl}
                       download={`${doc.formCode}-${doc.documentId}.pdf`}
                       className="text-blue-600 hover:text-blue-700"
                       title="Download Document"

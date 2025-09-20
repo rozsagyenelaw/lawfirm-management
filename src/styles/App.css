@@ -7680,6 +7680,374 @@ input:checked + .slider:before {
 .gc-remove-file-btn:hover {
   background: #FEE2E2;
 }
+/* Enhanced Tab Navigation Styles for Client Detail View */
+/* Add this to your existing app.css file or include as a separate stylesheet */
+
+/* Tab Container */
+.tabs-container {
+  background: white;
+  padding: 0;
+  margin-bottom: 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Tab Navigation List */
+.tab-navigation {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  position: relative;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab-navigation::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tab-navigation::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-navigation::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 2px;
+}
+
+/* Individual Tab Button Styles */
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Tab Button Hover Effect */
+.tab-button:hover:not(.active) {
+  background: white;
+  color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+/* Active Tab Style */
+.tab-button.active {
+  background: white;
+  color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  font-weight: 600;
+}
+
+/* Tab Icons */
+.tab-button svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+
+.tab-button:hover svg {
+  transform: scale(1.1);
+}
+
+.tab-button.active svg {
+  color: #3b82f6;
+}
+
+/* Tab Badge/Counter */
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #e0e7ff;
+  color: #4f46e5;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active .tab-badge {
+  background: #3b82f6;
+  color: white;
+}
+
+.tab-button:hover:not(.active) .tab-badge {
+  background: #dbeafe;
+  transform: scale(1.05);
+}
+
+/* Alternative Modern Style (Gradient Version) */
+.tabs-modern {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  border-radius: 14px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.tabs-modern .tab-button {
+  flex: 1;
+  min-width: 120px;
+  padding: 14px 24px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  position: relative;
+  overflow: hidden;
+}
+
+.tabs-modern .tab-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  border-radius: 8px;
+  z-index: -1;
+}
+
+.tabs-modern .tab-button:hover:not(.active) {
+  transform: translateY(-2px);
+  color: #667eea;
+  border-color: #667eea;
+  background: white;
+}
+
+.tabs-modern .tab-button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* Pills Style Tabs */
+.tabs-pills {
+  display: flex;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+}
+
+.tabs-pills .tab-button {
+  padding: 10px 24px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tabs-pills .tab-button:hover:not(.active) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateX(2px);
+}
+
+.tabs-pills .tab-button.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+/* Underline Style Tabs */
+.tabs-underline {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  border-bottom: 2px solid #e5e7eb;
+  background: transparent;
+}
+
+.tabs-underline .tab-button {
+  padding: 16px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tabs-underline .tab-button::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.tabs-underline .tab-button:hover:not(.active) {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.tabs-underline .tab-button:hover:not(.active)::after {
+  width: 50%;
+}
+
+.tabs-underline .tab-button.active {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.tabs-underline .tab-button.active::after {
+  width: 100%;
+}
+
+/* Tab with notification dot */
+.tab-notification {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/* Glassmorphism Style (Modern Trend) */
+.tabs-glass {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+}
+
+.tabs-glass .tab-button {
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #475569;
+  backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
+}
+
+.tabs-glass .tab-button:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tabs-glass .tab-button.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(139, 92, 246, 0.9));
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .tab-navigation {
+    gap: 4px;
+    padding: 6px;
+  }
+  
+  .tab-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+  
+  .tab-button svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tab-navigation {
+    gap: 2px;
+    padding: 4px;
+  }
+  
+  .tab-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .tab-button span {
+    display: none; /* Hide text on very small screens, show only icons */
+  }
+  
+  .tab-badge {
+    margin-left: 0;
+  }
+}
+
+/* Animation for tab switching */
+.tab-content-panel {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 
 

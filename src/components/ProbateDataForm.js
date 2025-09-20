@@ -1,6 +1,6 @@
 // src/components/ProbateDataForm.js
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, User, Calendar, Home, DollarSign, Users, FileText, Gavel } from 'lucide-react';
+import { Save, Plus, Trash2, User, Calendar, Home, DollarSign, Users, FileText, Gavel, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ProbateDataForm = ({ client, onSave }) => {
@@ -33,7 +33,6 @@ const ProbateDataForm = ({ client, onSave }) => {
     willDate: '',
     willSelfProving: 'no',
     executorNamedInWill: 'no',
-    estateValue: '',
     
     // Case Information
     caseNumber: '',
@@ -41,9 +40,7 @@ const ProbateDataForm = ({ client, onSave }) => {
     hearingDate: '',
     hearingTime: '',
     
-    // Administration
-    bondWaived: false,
-    independentAdmin: false,
+    // Administration Details
     adminType: 'full',
     bondRequired: 'no',
     bondAmount: '',
@@ -52,10 +49,21 @@ const ProbateDataForm = ({ client, onSave }) => {
     courtCounty: 'LOS ANGELES',
     courtBranch: 'STANLEY MOSK COURTHOUSE',
     
-    // Arrays
+    // Attorney Information (pre-filled)
+    attorneyName: 'ROZSA GYENE, ESQ.',
+    attorneyBar: '208356',
+    firmName: 'LAW OFFICES OF ROZSA GYENE',
+    firmStreet: '450 N BRAND BLVD SUITE 600',
+    firmCity: 'GLENDALE',
+    firmState: 'CA',
+    firmZip: '91203',
+    firmPhone: '818-291-6217',
+    firmFax: '818-291-6205',
+    firmEmail: 'ROZSAGYENELAW@YAHOO.COM',
+    
+    // Arrays for dynamic entries
     heirs: [],
-    realProperty: [],
-    personalProperty: [],
+    assets: [],
     debts: []
   });
 
@@ -69,7 +77,7 @@ const ProbateDataForm = ({ client, onSave }) => {
   const [newAsset, setNewAsset] = useState({ 
     description: '', 
     value: '', 
-    type: 'real' 
+    type: 'personal' 
   });
   
   const [newDebt, setNewDebt] = useState({ 
@@ -105,7 +113,7 @@ const ProbateDataForm = ({ client, onSave }) => {
     // Update client object with probate data
     const updatedClient = {
       ...client,
-      ...formData
+      probateData: formData
     };
     
     // Call parent save handler
@@ -118,12 +126,14 @@ const ProbateDataForm = ({ client, onSave }) => {
 
   // Heir management
   const addHeir = () => {
-    if (newHeir.name) {
+    if (newHeir.name && newHeir.relationship && newHeir.address) {
       setFormData(prev => ({
         ...prev,
         heirs: [...prev.heirs, { ...newHeir, id: Date.now() }]
       }));
       setNewHeir({ name: '', relationship: '', age: '', address: '' });
+    } else {
+      toast.error('Please fill in name, relationship, and address for the heir');
     }
   };
 
@@ -137,20 +147,20 @@ const ProbateDataForm = ({ client, onSave }) => {
   // Asset management
   const addAsset = () => {
     if (newAsset.description && newAsset.value) {
-      const assetList = newAsset.type === 'real' ? 'realProperty' : 'personalProperty';
       setFormData(prev => ({
         ...prev,
-        [assetList]: [...prev[assetList], { ...newAsset, id: Date.now() }]
+        assets: [...prev.assets, { ...newAsset, id: Date.now() }]
       }));
-      setNewAsset({ description: '', value: '', type: 'real' });
+      setNewAsset({ description: '', value: '', type: 'personal' });
+    } else {
+      toast.error('Please fill in description and value for the asset');
     }
   };
 
-  const removeAsset = (id, type) => {
-    const assetList = type === 'real' ? 'realProperty' : 'personalProperty';
+  const removeAsset = (id) => {
     setFormData(prev => ({
       ...prev,
-      [assetList]: prev[assetList].filter(a => a.id !== id)
+      assets: prev.assets.filter(a => a.id !== id)
     }));
   };
 
@@ -162,6 +172,8 @@ const ProbateDataForm = ({ client, onSave }) => {
         debts: [...prev.debts, { ...newDebt, id: Date.now() }]
       }));
       setNewDebt({ creditor: '', amount: '', description: '' });
+    } else {
+      toast.error('Please fill in creditor and amount for the debt');
     }
   };
 
@@ -182,970 +194,950 @@ const ProbateDataForm = ({ client, onSave }) => {
     }).format(num);
   };
 
+  // Calculate total estate value
+  const calculateTotalEstate = () => {
+    const personal = parseFloat(formData.personalPropertyValue || 0);
+    const realGross = parseFloat(formData.realPropertyGross || 0);
+    const realNet = realGross - parseFloat(formData.realPropertyEncumbrance || 0);
+    const assetTotal = formData.assets.reduce((sum, asset) => sum + parseFloat(asset.value || 0), 0);
+    return personal + realNet + assetTotal;
+  };
+
   return (
-    <div className="probate-data-form bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Probate Information Form
-        </h3>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Save size={18} />
-          Save Data
-        </button>
-      </div>
+    <div className="probate-data-form">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Probate Information Form</h3>
+            <p className="text-sm text-gray-500 mt-1">Complete all required fields for probate petition</p>
+          </div>
+          <span className="category-badge probate">Probate</span>
+        </div>
 
-      {/* Decedent Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <User size={18} />
-          Decedent Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="decedentName"
-              value={formData.decedentName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Full legal name"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date of Death <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              name="dateOfDeath" 
-              value={formData.dateOfDeath}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Place of Death <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="placeOfDeath"
-              value={formData.placeOfDeath}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="City, State"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              California Resident? <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="californiaResident"
-              value={formData.californiaResident}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address at Time of Death <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="deathAddress"
-              value={formData.deathAddress}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Full address"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Family Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Users size={18} />
-          Family Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Was decedent survived by a spouse?
-            </label>
-            <select
-              name="hasSpouse"
-              value={formData.hasSpouse}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Was decedent survived by children?
-            </label>
-            <select
-              name="hasChildren"
-              value={formData.hasChildren}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Survived by grandchildren?
-            </label>
-            <select
-              name="hasGrandchildren"
-              value={formData.hasGrandchildren}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Petitioner Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <User size={18} />
-          Petitioner Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="petitionerName"
-              value={formData.petitionerName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Relationship to Decedent <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="petitionerRelationship"
-              value={formData.petitionerRelationship}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="">Select...</option>
-              <option value="Spouse">Spouse</option>
-              <option value="Child">Child</option>
-              <option value="Parent">Parent</option>
-              <option value="Sibling">Sibling</option>
-              <option value="Other Relative">Other Relative</option>
-              <option value="Creditor">Creditor</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="petitionerAddress"
-              value={formData.petitionerAddress}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              name="petitionerPhone"
-              value={formData.petitionerPhone}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Is Petitioner Named as Executor in Will?
-            </label>
-            <select
-              name="petitionerIsExecutor"
-              value={formData.petitionerIsExecutor}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Estate Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <DollarSign size={18} />
-          Estate Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Personal Property Value <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              name="personalPropertyValue"
-              value={formData.personalPropertyValue}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Enter amount without $"
-            />
-            <span className="text-xs text-gray-500">Bank accounts, vehicles, jewelry, etc.</span>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Real Property Gross Value
-            </label>
-            <input
-              type="number"
-              name="realPropertyGross"
-              value={formData.realPropertyGross}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Enter amount without $"
-            />
-            <span className="text-xs text-gray-500">Total value of real estate</span>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Real Property Encumbrances
-            </label>
-            <input
-              type="number"
-              name="realPropertyEncumbrance"
-              value={formData.realPropertyEncumbrance}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Enter amount without $"
-            />
-            <span className="text-xs text-gray-500">Mortgages/liens on real estate</span>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Is There a Will? <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="hasWill"
-              value={formData.hasWill ? 'yes' : 'no'}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                hasWill: e.target.value === 'yes'
-              }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          
-          {formData.hasWill && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date of Will
-                </label>
-                <input
-                  type="date"
-                  name="willDate"
-                  value={formData.willDate}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Is Will Self-Proving?
-                </label>
-                <select
-                  name="willSelfProving"
-                  value={formData.willSelfProving}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-                <span className="text-xs text-gray-500">A self-proving will includes notarized witness affidavits</span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Is there an executor named in the will?
-                </label>
-                <select
-                  name="executorNamedInWill"
-                  value={formData.executorNamedInWill}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Heirs and Beneficiaries */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Users size={18} />
-          Heirs and Beneficiaries
-        </h4>
-        
-        <div className="space-y-2 mb-4">
-          {formData.heirs.map(heir => (
-            <div key={heir.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <span className="font-medium">{heir.name}</span>
-                <span className="text-gray-600 ml-2">({heir.relationship})</span>
-                {heir.age && <span className="text-gray-500 ml-2">Age: {heir.age}</span>}
-                <div className="text-sm text-gray-500">{heir.address}</div>
-              </div>
-              <button
-                onClick={() => removeHeir(heir.id)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-          ))}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-          <input
-            type="text"
-            value={newHeir.name}
-            onChange={(e) => setNewHeir({ ...newHeir, name: e.target.value })}
-            placeholder="Name (e.g., Jane Smith or The John Rude Living Trust)"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <select
-            value={newHeir.relationship}
-            onChange={(e) => setNewHeir({ ...newHeir, relationship: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          >
-            <option value="">Select Relationship...</option>
-            <option value="Spouse">Spouse</option>
-            <option value="Child">Child (Son/Daughter)</option>
-            <option value="Son">Son</option>
-            <option value="Daughter">Daughter</option>
-            <option value="Grandchild">Grandchild</option>
-            <option value="Parent">Parent</option>
-            <option value="Sibling">Sibling</option>
-            <option value="Brother">Brother</option>
-            <option value="Sister">Sister</option>
-            <option value="Niece">Niece</option>
-            <option value="Nephew">Nephew</option>
-            <option value="Beneficiary">Beneficiary</option>
-            <option value="Trust">Trust</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <input
-            type="text"
-            value={newHeir.age}
-            onChange={(e) => setNewHeir({ ...newHeir, age: e.target.value })}
-            placeholder="Age (or N/A for trusts)"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="text"
-            value={newHeir.address}
-            onChange={(e) => setNewHeir({ ...newHeir, address: e.target.value })}
-            placeholder="Address (e.g., 123 Main St Los Angeles CA 90001)"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-        </div>
-        <button
-          onClick={addHeir}
-          className="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add Heir/Beneficiary
-        </button>
-        <p className="text-xs text-gray-500 mt-2">Include all heirs, beneficiaries, and anyone named in the will. For trusts, use "N/A" for age.</p>
-      </div>
-
-      {/* Administration Details */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Gavel size={18} />
-          Administration Details
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type of Authority Requested <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="adminType"
-              value={formData.adminType}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="full">Full Authority (Independent Administration)</option>
-              <option value="limited">Limited Authority</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Is Bond Required? <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="bondRequired"
-              value={formData.bondRequired}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          {formData.bondRequired === 'yes' && (
+        {/* Decedent Information Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <User className="w-4 h-4" />
+            Decedent Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bond Amount
+              <label htmlFor="decedentName">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="decedentName"
+                name="decedentName"
+                value={formData.decedentName}
+                onChange={handleChange}
+                required
+                placeholder="Full legal name"
+              />
+            </div>
+            <div>
+              <label htmlFor="dateOfDeath">
+                Date of Death <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="dateOfDeath"
+                name="dateOfDeath" 
+                value={formData.dateOfDeath}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="placeOfDeath">
+                Place of Death <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="placeOfDeath"
+                name="placeOfDeath"
+                value={formData.placeOfDeath}
+                onChange={handleChange}
+                required
+                placeholder="City, State"
+              />
+            </div>
+            <div>
+              <label htmlFor="californiaResident">
+                California Resident? <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="californiaResident"
+                name="californiaResident"
+                value={formData.californiaResident}
+                onChange={handleChange}
+                required
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="deathAddress">
+                Address at Time of Death <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="deathAddress"
+                name="deathAddress"
+                value={formData.deathAddress}
+                onChange={handleChange}
+                required
+                placeholder="Full address"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Family Information Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Family Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label>Was decedent survived by a spouse? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasSpouse"
+                    value="yes"
+                    checked={formData.hasSpouse === 'yes'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">Yes</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasSpouse"
+                    value="no"
+                    checked={formData.hasSpouse === 'no'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">No</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label>Was decedent survived by children? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasChildren"
+                    value="yes"
+                    checked={formData.hasChildren === 'yes'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">Yes</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasChildren"
+                    value="no"
+                    checked={formData.hasChildren === 'no'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">No</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label>Survived by grandchildren? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasGrandchildren"
+                    value="yes"
+                    checked={formData.hasGrandchildren === 'yes'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">Yes</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasGrandchildren"
+                    value="no"
+                    checked={formData.hasGrandchildren === 'no'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">No</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Petitioner Information Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <User className="w-4 h-4" />
+            Petitioner Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="petitionerName">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="petitionerName"
+                name="petitionerName"
+                value={formData.petitionerName}
+                onChange={handleChange}
+                required
+                placeholder="Petitioner's full name"
+              />
+            </div>
+            <div>
+              <label htmlFor="petitionerRelationship">
+                Relationship to Decedent <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="petitionerRelationship"
+                name="petitionerRelationship"
+                value={formData.petitionerRelationship}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select...</option>
+                <option value="Spouse">Spouse</option>
+                <option value="Child">Child</option>
+                <option value="Parent">Parent</option>
+                <option value="Sibling">Sibling</option>
+                <option value="Other Relative">Other Relative</option>
+                <option value="Creditor">Creditor</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="petitionerAddress">
+                Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="petitionerAddress"
+                name="petitionerAddress"
+                value={formData.petitionerAddress}
+                onChange={handleChange}
+                required
+                placeholder="Full address"
+              />
+            </div>
+            <div>
+              <label htmlFor="petitionerPhone">
+                Phone Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                id="petitionerPhone"
+                name="petitionerPhone"
+                value={formData.petitionerPhone}
+                onChange={handleChange}
+                required
+                placeholder="(xxx) xxx-xxxx"
+              />
+            </div>
+            <div>
+              <label htmlFor="petitionerEmail">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="petitionerEmail"
+                name="petitionerEmail"
+                value={formData.petitionerEmail}
+                onChange={handleChange}
+                placeholder="email@example.com"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label>Is Petitioner Named as Executor in Will?</label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="petitionerIsExecutor"
+                    value="yes"
+                    checked={formData.petitionerIsExecutor === 'yes'}
+                    onChange={handleChange}
+                  />
+                  <span className="ml-2">Yes</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="petitionerIsExecutor"
+                    value="no"
+                    checked={formData.petitionerIsExecutor === 'no'}
+                    onChange={handleChange}
+                  />
+                  <span className="ml-2">No</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Estate Information Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4" />
+            Estate Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="personalPropertyValue">
+                Personal Property Value <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
-                name="bondAmount"
-                value={formData.bondAmount}
+                id="personalPropertyValue"
+                name="personalPropertyValue"
+                value={formData.personalPropertyValue}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
                 placeholder="Enter amount without $"
               />
+              <p className="text-xs text-gray-500 mt-1">Bank accounts, vehicles, jewelry, etc.</p>
             </div>
-          )}
+            <div>
+              <label htmlFor="realPropertyGross">
+                Real Property Gross Value
+              </label>
+              <input
+                type="number"
+                id="realPropertyGross"
+                name="realPropertyGross"
+                value={formData.realPropertyGross}
+                onChange={handleChange}
+                placeholder="Enter amount without $"
+              />
+              <p className="text-xs text-gray-500 mt-1">Total value of real estate</p>
+            </div>
+            <div>
+              <label htmlFor="realPropertyEncumbrance">
+                Real Property Encumbrances
+              </label>
+              <input
+                type="number"
+                id="realPropertyEncumbrance"
+                name="realPropertyEncumbrance"
+                value={formData.realPropertyEncumbrance}
+                onChange={handleChange}
+                placeholder="Enter amount without $"
+              />
+              <p className="text-xs text-gray-500 mt-1">Mortgages/liens on real estate</p>
+            </div>
+            <div>
+              <label>Is There a Will? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasWill"
+                    value="yes"
+                    checked={formData.hasWill === true}
+                    onChange={(e) => setFormData(prev => ({ ...prev, hasWill: true }))}
+                    required
+                  />
+                  <span className="ml-2">Yes</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="hasWill"
+                    value="no"
+                    checked={formData.hasWill === false}
+                    onChange={(e) => setFormData(prev => ({ ...prev, hasWill: false }))}
+                    required
+                  />
+                  <span className="ml-2">No</span>
+                </label>
+              </div>
+            </div>
+            
+            {formData.hasWill && (
+              <>
+                <div>
+                  <label htmlFor="willDate">
+                    Date of Will
+                  </label>
+                  <input
+                    type="date"
+                    id="willDate"
+                    name="willDate"
+                    value={formData.willDate}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label>Is Will Self-Proving?</label>
+                  <div className="flex gap-4 mt-2">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="willSelfProving"
+                        value="yes"
+                        checked={formData.willSelfProving === 'yes'}
+                        onChange={handleChange}
+                      />
+                      <span className="ml-2">Yes</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="willSelfProving"
+                        value="no"
+                        checked={formData.willSelfProving === 'no'}
+                        onChange={handleChange}
+                      />
+                      <span className="ml-2">No</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">A self-proving will includes notarized witness affidavits</p>
+                </div>
+                <div>
+                  <label>Is there an executor named in the will?</label>
+                  <div className="flex gap-4 mt-2">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="executorNamedInWill"
+                        value="yes"
+                        checked={formData.executorNamedInWill === 'yes'}
+                        onChange={handleChange}
+                      />
+                      <span className="ml-2">Yes</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="executorNamedInWill"
+                        value="no"
+                        checked={formData.executorNamedInWill === 'no'}
+                        onChange={handleChange}
+                      />
+                      <span className="ml-2">No</span>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          
+          {/* Estate Value Summary */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+            <p className="text-sm text-blue-700 flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Estimated Total Estate Value: <strong>{formatCurrency(calculateTotalEstate())}</strong>
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Court Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Gavel size={18} />
-          Court Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              County
-            </label>
-            <select
-              name="courtCounty"
-              value={formData.courtCounty}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        {/* Heirs and Beneficiaries Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Heirs and Beneficiaries
+          </h4>
+          
+          <div className="space-y-2 mb-4">
+            {formData.heirs.map(heir => (
+              <div key={heir.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <span className="font-medium">{heir.name}</span>
+                  <span className="text-gray-600 ml-2">({heir.relationship})</span>
+                  {heir.age && <span className="text-gray-500 ml-2">Age: {heir.age}</span>}
+                  <div className="text-sm text-gray-500">{heir.address}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeHeir(heir.id)}
+                  className="text-red-500 hover:text-red-700 p-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {formData.heirs.length === 0 && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                No heirs or beneficiaries added yet
+              </div>
+            )}
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h5 className="text-sm font-medium text-gray-700 mb-3">Add Heir/Beneficiary</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-600">Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newHeir.name}
+                  onChange={(e) => setNewHeir({ ...newHeir, name: e.target.value })}
+                  placeholder="e.g., Jane Smith or The John Rude Living Trust"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Relationship <span className="text-red-500">*</span></label>
+                <select
+                  value={newHeir.relationship}
+                  onChange={(e) => setNewHeir({ ...newHeir, relationship: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="">Select...</option>
+                  <option value="Spouse">Spouse</option>
+                  <option value="Child">Child (Son/Daughter)</option>
+                  <option value="Son">Son</option>
+                  <option value="Daughter">Daughter</option>
+                  <option value="Grandchild">Grandchild</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Sibling">Sibling</option>
+                  <option value="Brother">Brother</option>
+                  <option value="Sister">Sister</option>
+                  <option value="Niece">Niece</option>
+                  <option value="Nephew">Nephew</option>
+                  <option value="Beneficiary">Beneficiary</option>
+                  <option value="Trust">Trust</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Age</label>
+                <input
+                  type="text"
+                  value={newHeir.age}
+                  onChange={(e) => setNewHeir({ ...newHeir, age: e.target.value })}
+                  placeholder="Age or N/A for trusts"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Address <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newHeir.address}
+                  onChange={(e) => setNewHeir({ ...newHeir, address: e.target.value })}
+                  placeholder="e.g., 123 Main St Los Angeles CA 90001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={addHeir}
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm"
             >
-              <option value="LOS ANGELES">Los Angeles</option>
-              <option value="ORANGE">Orange</option>
-              <option value="SAN DIEGO">San Diego</option>
-              <option value="RIVERSIDE">Riverside</option>
-              <option value="SAN BERNARDINO">San Bernardino</option>
-              <option value="VENTURA">Ventura</option>
-              <option value="SANTA BARBARA">Santa Barbara</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Court Branch
-            </label>
-            <input
-              type="text"
-              name="courtBranch"
-              value={formData.courtBranch}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
+              <Plus className="w-4 h-4" />
+              Add Heir/Beneficiary
+            </button>
+            <p className="text-xs text-gray-500 mt-2">Include all heirs, beneficiaries, and anyone named in the will. For trusts, use "N/A" for age.</p>
           </div>
         </div>
-      </div>
 
-      {/* ALTERNATIVE SECTIONS - Lines 806-1210 from your original */}
-      
-      {/* Alternative Decedent Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <User size={18} />
-          Decedent Information (Simplified)
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Decedent Name *
-            </label>
-            <input
-              type="text"
-              name="decedentName"
-              value={formData.decedentName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Full legal name"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date of Death *
-            </label>
-            <input
-              type="date"
-              name="dateOfDeath"
-              value={formData.dateOfDeath}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Place of Death
-            </label>
-            <input
-              type="text"
-              name="placeOfDeath"
-              value={formData.placeOfDeath}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="City, County, State"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Alternative Petitioner Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <User size={18} />
-          Petitioner Information (Extended)
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Petitioner Name *
-            </label>
-            <input
-              type="text"
-              name="petitionerName"
-              value={formData.petitionerName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Relationship to Decedent *
-            </label>
-            <input
-              type="text"
-              name="petitionerRelationship"
-              value={formData.petitionerRelationship}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="e.g., Spouse, Child, Parent"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Petitioner Address
-            </label>
-            <input
-              type="text"
-              name="petitionerAddress"
-              value={formData.petitionerAddress}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
-            </label>
-            <input
-              type="tel"
-              name="petitionerPhone"
-              value={formData.petitionerPhone}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              name="petitionerEmail"
-              value={formData.petitionerEmail}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Case Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Calendar size={18} />
-          Case Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Case Number
-            </label>
-            <input
-              type="text"
-              name="caseNumber"
-              value={formData.caseNumber}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Hearing Department
-            </label>
-            <input
-              type="text"
-              name="hearingDept"
-              value={formData.hearingDept}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Hearing Date
-            </label>
-            <input
-              type="date"
-              name="hearingDate"
-              value={formData.hearingDate}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Hearing Time
-            </label>
-            <input
-              type="time"
-              name="hearingTime"
-              value={formData.hearingTime}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Alternative Estate Information */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <DollarSign size={18} />
-          Estate Information (Summary)
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Estimated Estate Value
-            </label>
-            <input
-              type="text"
-              name="estateValue"
-              value={formData.estateValue}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="$0.00"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Will Date (if applicable)
-            </label>
-            <input
-              type="date"
-              name="willDate"
-              value={formData.willDate}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              disabled={!formData.hasWill}
-            />
-          </div>
-          <div className="md:col-span-2 space-y-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="hasWill"
-                checked={formData.hasWill}
+        {/* Administration Details Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <Gavel className="w-4 h-4" />
+            Administration Details
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="adminType">
+                Type of Authority Requested <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="adminType"
+                name="adminType"
+                value={formData.adminType}
                 onChange={handleChange}
-                className="rounded"
-              />
-              <span className="text-sm">Decedent left a will</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="bondWaived"
-                checked={formData.bondWaived}
-                onChange={handleChange}
-                className="rounded"
-              />
-              <span className="text-sm">Bond waived</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="independentAdmin"
-                checked={formData.independentAdmin}
-                onChange={handleChange}
-                className="rounded"
-              />
-              <span className="text-sm">Independent administration requested</span>
-            </label>
+                required
+              >
+                <option value="full">Full Authority (Independent Administration)</option>
+                <option value="limited">Limited Authority</option>
+              </select>
+            </div>
+            <div>
+              <label>Is Bond Required? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="bondRequired"
+                    value="yes"
+                    checked={formData.bondRequired === 'yes'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">Yes</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="bondRequired"
+                    value="no"
+                    checked={formData.bondRequired === 'no'}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span className="ml-2">No</span>
+                </label>
+              </div>
+            </div>
+            {formData.bondRequired === 'yes' && (
+              <div>
+                <label htmlFor="bondAmount">
+                  Bond Amount
+                </label>
+                <input
+                  type="number"
+                  id="bondAmount"
+                  name="bondAmount"
+                  value={formData.bondAmount}
+                  onChange={handleChange}
+                  placeholder="Enter amount without $"
+                />
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Alternative Heirs and Beneficiaries - with only 3 columns */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Users size={18} />
-          Heirs and Beneficiaries (Simple)
-        </h4>
-        
-        <div className="space-y-2 mb-4">
-          {formData.heirs.map(heir => (
-            <div key={heir.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <span className="font-medium">{heir.name}</span>
-                <span className="text-gray-600 ml-2">({heir.relationship})</span>
-                <div className="text-sm text-gray-500">{heir.address}</div>
-              </div>
-              <button
-                onClick={() => removeHeir(heir.id)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={18} />
-              </button>
+        {/* Case Information Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Case Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="caseNumber">
+                Case Number
+              </label>
+              <input
+                type="text"
+                id="caseNumber"
+                name="caseNumber"
+                value={formData.caseNumber}
+                onChange={handleChange}
+                placeholder="Leave blank if new case"
+              />
             </div>
-          ))}
+            <div>
+              <label htmlFor="hearingDept">
+                Hearing Department
+              </label>
+              <input
+                type="text"
+                id="hearingDept"
+                name="hearingDept"
+                value={formData.hearingDept}
+                onChange={handleChange}
+                placeholder="Will be assigned by court"
+              />
+            </div>
+            <div>
+              <label htmlFor="hearingDate">
+                Hearing Date
+              </label>
+              <input
+                type="date"
+                id="hearingDate"
+                name="hearingDate"
+                value={formData.hearingDate}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <label htmlFor="hearingTime">
+                Hearing Time
+              </label>
+              <input
+                type="time"
+                id="hearingTime"
+                name="hearingTime"
+                value={formData.hearingTime}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <input
-            type="text"
-            value={newHeir.name}
-            onChange={(e) => setNewHeir({ ...newHeir, name: e.target.value })}
-            placeholder="Heir name"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="text"
-            value={newHeir.relationship}
-            onChange={(e) => setNewHeir({ ...newHeir, relationship: e.target.value })}
-            placeholder="Relationship"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="text"
-            value={newHeir.address}
-            onChange={(e) => setNewHeir({ ...newHeir, address: e.target.value })}
-            placeholder="Address"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-        </div>
-        <button
-          onClick={addHeir}
-          className="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add Heir
-        </button>
-      </div>
 
-      {/* Assets */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <Home size={18} />
-          Assets
-        </h4>
-        
-        {/* Real Property */}
-        <h5 className="text-sm font-medium text-gray-700 mb-2">Real Property</h5>
-        <div className="space-y-2 mb-4">
-          {formData.realProperty.map(asset => (
-            <div key={asset.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <span className="font-medium">{asset.description}</span>
-                <span className="text-gray-600 ml-2">{formatCurrency(asset.value)}</span>
-              </div>
-              <button
-                onClick={() => removeAsset(asset.id, 'real')}
-                className="text-red-500 hover:text-red-700"
+        {/* Court Information Section */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <Gavel className="w-4 h-4" />
+            Court Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="courtCounty">
+                County <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="courtCounty"
+                name="courtCounty"
+                value={formData.courtCounty}
+                onChange={handleChange}
+                required
               >
-                <Trash2 size={18} />
-              </button>
+                <option value="LOS ANGELES">Los Angeles</option>
+                <option value="ORANGE">Orange</option>
+                <option value="SAN DIEGO">San Diego</option>
+                <option value="RIVERSIDE">Riverside</option>
+                <option value="SAN BERNARDINO">San Bernardino</option>
+                <option value="VENTURA">Ventura</option>
+                <option value="SANTA BARBARA">Santa Barbara</option>
+              </select>
             </div>
-          ))}
+            <div>
+              <label htmlFor="courtBranch">
+                Court Branch
+              </label>
+              <input
+                type="text"
+                id="courtBranch"
+                name="courtBranch"
+                value={formData.courtBranch}
+                onChange={handleChange}
+                placeholder="Branch name"
+              />
+            </div>
+          </div>
         </div>
-        
-        {/* Personal Property */}
-        <h5 className="text-sm font-medium text-gray-700 mb-2 mt-4">Personal Property</h5>
-        <div className="space-y-2 mb-4">
-          {formData.personalProperty.map(asset => (
-            <div key={asset.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <span className="font-medium">{asset.description}</span>
-                <span className="text-gray-600 ml-2">{formatCurrency(asset.value)}</span>
+
+        {/* Assets Section (Optional) */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <Home className="w-4 h-4" />
+            Assets (Optional - For Inventory)
+          </h4>
+          
+          <div className="space-y-2 mb-4">
+            {formData.assets.map(asset => (
+              <div key={asset.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <span className="font-medium">{asset.description}</span>
+                  <span className="ml-2 text-gray-600">
+                    ({asset.type === 'real' ? 'Real Property' : 'Personal Property'})
+                  </span>
+                  <span className="ml-2 text-gray-700">{formatCurrency(asset.value)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeAsset(asset.id)}
+                  className="text-red-500 hover:text-red-700 p-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => removeAsset(asset.id, 'personal')}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={18} />
-              </button>
+            ))}
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h5 className="text-sm font-medium text-gray-700 mb-3">Add Asset</h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-gray-600">Type</label>
+                <select
+                  value={newAsset.type}
+                  onChange={(e) => setNewAsset({ ...newAsset, type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="personal">Personal Property</option>
+                  <option value="real">Real Property</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Description</label>
+                <input
+                  type="text"
+                  value={newAsset.description}
+                  onChange={(e) => setNewAsset({ ...newAsset, description: e.target.value })}
+                  placeholder="Asset description"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Value</label>
+                <input
+                  type="number"
+                  value={newAsset.value}
+                  onChange={(e) => setNewAsset({ ...newAsset, value: e.target.value })}
+                  placeholder="Value"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
             </div>
-          ))}
+            <button
+              type="button"
+              onClick={addAsset}
+              className="mt-3 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Asset
+            </button>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <select
-            value={newAsset.type}
-            onChange={(e) => setNewAsset({ ...newAsset, type: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md"
+
+        {/* Debts Section (Optional) */}
+        <div className="section">
+          <h4 className="text-gray-700 font-medium mb-4 flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Debts and Liabilities (Optional)
+          </h4>
+          
+          <div className="space-y-2 mb-4">
+            {formData.debts.map(debt => (
+              <div key={debt.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <span className="font-medium">{debt.creditor}</span>
+                  <span className="ml-2 text-gray-700">{formatCurrency(debt.amount)}</span>
+                  {debt.description && (
+                    <div className="text-sm text-gray-500">{debt.description}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeDebt(debt.id)}
+                  className="text-red-500 hover:text-red-700 p-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h5 className="text-sm font-medium text-gray-700 mb-3">Add Debt</h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-gray-600">Creditor</label>
+                <input
+                  type="text"
+                  value={newDebt.creditor}
+                  onChange={(e) => setNewDebt({ ...newDebt, creditor: e.target.value })}
+                  placeholder="Creditor name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Amount</label>
+                <input
+                  type="number"
+                  value={newDebt.amount}
+                  onChange={(e) => setNewDebt({ ...newDebt, amount: e.target.value })}
+                  placeholder="Amount owed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Description</label>
+                <input
+                  type="text"
+                  value={newDebt.description}
+                  onChange={(e) => setNewDebt({ ...newDebt, description: e.target.value })}
+                  placeholder="Description (optional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={addDebt}
+              className="mt-3 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Debt
+            </button>
+          </div>
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex justify-end mt-8 gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to clear all data?')) {
+                setFormData({
+                  decedentName: '',
+                  dateOfDeath: '',
+                  placeOfDeath: '',
+                  deathAddress: '',
+                  californiaResident: 'yes',
+                  hasSpouse: 'no',
+                  hasChildren: 'no',
+                  hasGrandchildren: 'no',
+                  petitionerName: client?.name || '',
+                  petitionerRelationship: '',
+                  petitionerAddress: client?.address || '',
+                  petitionerPhone: client?.phone || '',
+                  petitionerEmail: client?.email || '',
+                  petitionerIsExecutor: 'no',
+                  personalPropertyValue: '',
+                  realPropertyGross: '',
+                  realPropertyEncumbrance: '',
+                  hasWill: false,
+                  willDate: '',
+                  willSelfProving: 'no',
+                  executorNamedInWill: 'no',
+                  caseNumber: '',
+                  hearingDept: '',
+                  hearingDate: '',
+                  hearingTime: '',
+                  adminType: 'full',
+                  bondRequired: 'no',
+                  bondAmount: '',
+                  courtCounty: 'LOS ANGELES',
+                  courtBranch: 'STANLEY MOSK COURTHOUSE',
+                  attorneyName: 'ROZSA GYENE, ESQ.',
+                  attorneyBar: '208356',
+                  firmName: 'LAW OFFICES OF ROZSA GYENE',
+                  firmStreet: '450 N BRAND BLVD SUITE 600',
+                  firmCity: 'GLENDALE',
+                  firmState: 'CA',
+                  firmZip: '91203',
+                  firmPhone: '818-291-6217',
+                  firmFax: '818-291-6205',
+                  firmEmail: 'ROZSAGYENELAW@YAHOO.COM',
+                  heirs: [],
+                  assets: [],
+                  debts: []
+                });
+                toast.success('Form cleared');
+              }
+            }}
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
           >
-            <option value="real">Real Property</option>
-            <option value="personal">Personal Property</option>
-          </select>
-          <input
-            type="text"
-            value={newAsset.description}
-            onChange={(e) => setNewAsset({ ...newAsset, description: e.target.value })}
-            placeholder="Asset description"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="text"
-            value={newAsset.value}
-            onChange={(e) => setNewAsset({ ...newAsset, value: e.target.value })}
-            placeholder="Value"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
+            Clear Form
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            Save Probate Information
+          </button>
         </div>
-        <button
-          onClick={addAsset}
-          className="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add Asset
-        </button>
-      </div>
-
-      {/* Debts */}
-      <div className="section mb-6">
-        <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center gap-2">
-          <FileText size={18} />
-          Debts and Liabilities
-        </h4>
-        
-        <div className="space-y-2 mb-4">
-          {formData.debts.map(debt => (
-            <div key={debt.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <span className="font-medium">{debt.creditor}</span>
-                <span className="text-gray-600 ml-2">{formatCurrency(debt.amount)}</span>
-                {debt.description && (
-                  <div className="text-sm text-gray-500">{debt.description}</div>
-                )}
-              </div>
-              <button
-                onClick={() => removeDebt(debt.id)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-          ))}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <input
-            type="text"
-            value={newDebt.creditor}
-            onChange={(e) => setNewDebt({ ...newDebt, creditor: e.target.value })}
-            placeholder="Creditor name"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="text"
-            value={newDebt.amount}
-            onChange={(e) => setNewDebt({ ...newDebt, amount: e.target.value })}
-            placeholder="Amount owed"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="text"
-            value={newDebt.description}
-            onChange={(e) => setNewDebt({ ...newDebt, description: e.target.value })}
-            placeholder="Description (optional)"
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-        </div>
-        <button
-          onClick={addDebt}
-          className="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add Debt
-        </button>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end mt-8">
-        <button
-          onClick={handleSave}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium"
-        >
-          <Save size={20} />
-          Save Probate Information
-        </button>
-      </div>
+      </form>
     </div>
   );
 };

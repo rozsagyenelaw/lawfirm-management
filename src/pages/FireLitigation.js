@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FireCaseDashboard } from '../components/FireCaseDashboard';
 import { Flame, AlertTriangle, Calendar, Mail, FileText, Users, Clock, CheckCircle, AlertCircle, Download, RefreshCw } from 'lucide-react';
 import { format, isAfter, addDays, differenceInDays } from 'date-fns';
 import { useData } from '../context/DataContext';

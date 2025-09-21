@@ -3,7 +3,7 @@ import { AlertTriangle, Mail, Calendar, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Your Google Apps Script Web App URL
-const FIRE_MONITOR_API = 'https://corsproxy.io/?https://script.google.com/macros/s/AKfycbwLQSSa9jyxy7oHqeHWMzLIWQP_aG4_PzXdJAYRAxDKlw0SJw6XjOw_jdWHa7EEGdwC2w/exec';
+const FIRE_MONITOR_API = 'https://script.google.com/macros/s/AKfycbyQ3AA4Q1xtPbLu3uClpavvAxnm-s4ApdtVm5KzW1M8_F9yvWQwZwgXyNGL_zSZrVxK5Q/exec';
 
 const FireCaseDashboard = () => {
   const [fireCases, setFireCases] = useState([]);

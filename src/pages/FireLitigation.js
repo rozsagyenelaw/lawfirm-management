@@ -213,6 +213,11 @@ const FireLitigation = () => {
         </div>
       )}
       
+      {/* Fire Case Email Monitor Dashboard - Always Visible */}
+      <div style={{ marginBottom: '30px' }}>
+        <FireCaseDashboard />
+      </div>
+      
       <div className="fire-litigation-grid">
         {/* Client Overview */}
         <div className="fire-section">

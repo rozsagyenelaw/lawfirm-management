@@ -1,7 +1,6 @@
 // ============================================
 // REACT INTEGRATION FOR FIRE CASE MONITOR
 // ============================================
-// Add this to your React law firm management app
 // This fetches fire case data from your Google Apps Script
 
 import React, { useState, useEffect } from 'react';
@@ -304,39 +303,3 @@ const FireCaseEmailHandler = ({ onNewCase }) => {
 };
 
 export { FireCaseDashboard, FireCaseEmailHandler };
-
-// ============================================
-// USAGE IN YOUR MAIN APP
-// ============================================
-
-/*
-// In your main dashboard component:
-
-import { FireCaseDashboard, FireCaseEmailHandler } from './FireCaseDashboard';
-
-function MainDashboard() {
-  const handleNewFireCase = (caseData) => {
-    // Handle new fire case detection
-    console.log('New fire case detected:', caseData);
-    
-    // You could:
-    // - Update your case list
-    // - Show a notification
-    // - Create a new client record
-    // - Open the DocumentAnalyzer with this email
-  };
-
-  return (
-    <div>
-      {/* Background monitor for new cases */}
-      <FireCaseEmailHandler onNewCase={handleNewFireCase} />
-      
-      {/* Your existing dashboard components */}
-      <YourExistingComponents />
-      
-      {/* Fire case section */}
-      <FireCaseDashboard />
-    </div>
-  );
-}
-*/

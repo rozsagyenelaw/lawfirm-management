@@ -1,7 +1,3 @@
-/ ============================================
-// REACT INTEGRATION FOR FIRE CASE MONITOR
-// ============================================
-
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Mail, Calendar, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,17 +11,14 @@ const FireCaseDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  // Fetch fire case data - simplified without CORS mode
+  // Fetch fire case data
   const fetchFireCaseData = async () => {
     try {
       setLoading(true);
       console.log('Fetching fire case data...');
       
-      // Simple fetch without mode specification
       const response = await fetch(FIRE_MONITOR_API);
       const text = await response.text();
-      
-      // Parse the response
       const data = JSON.parse(text);
       console.log('Data received:', data);
       
@@ -34,7 +27,6 @@ const FireCaseDashboard = () => {
         setSummary(data.data.summary || {});
         setLastUpdate(new Date());
         
-        // Show toast only if there are cases
         if (data.data.cases && data.data.cases.length > 0) {
           toast.success(`Loaded ${data.data.cases.length} fire case emails`);
         }
@@ -44,7 +36,6 @@ const FireCaseDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching fire cases:', error);
-      // Don't show error toast on initial load
       if (lastUpdate) {
         toast.error('Could not refresh data');
       }
@@ -53,18 +44,14 @@ const FireCaseDashboard = () => {
     }
   };
 
-  // Auto-refresh every 5 minutes
   useEffect(() => {
     fetchFireCaseData();
-    
     const interval = setInterval(() => {
       fetchFireCaseData();
     }, 5 * 60 * 1000);
-    
     return () => clearInterval(interval);
   }, []);
 
-  // Format date
   const formatDate = (dateString) => {
     try {
       return new Date(dateString).toLocaleString();
@@ -73,14 +60,12 @@ const FireCaseDashboard = () => {
     }
   };
 
-  // Get case type color
   const getCaseTypeColor = (caseType) => {
     if (caseType?.includes('Eaton')) return 'eaton-case';
     if (caseType?.includes('Pacific') || caseType?.includes('Palisades')) return 'pacific-case';
     return 'other-case';
   };
 
-  // Get priority color
   const getPriorityColor = (priority) => {
     if (priority === 'high') return 'priority-high';
     if (priority === 'medium') return 'priority-medium';
@@ -94,7 +79,6 @@ const FireCaseDashboard = () => {
       borderRadius: '8px',
       marginBottom: '20px' 
     }}>
-      {/* Header */}
       <div className="dashboard-header" style={{ marginBottom: '20px' }}>
         <h2 style={{ 
           display: 'flex', 
@@ -111,7 +95,6 @@ const FireCaseDashboard = () => {
         </p>
       </div>
 
-      {/* Summary Cards */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -167,7 +150,6 @@ const FireCaseDashboard = () => {
         </div>
       </div>
 
-      {/* Controls */}
       <div style={{ 
         display: 'flex',
         justifyContent: 'space-between',
@@ -193,7 +175,6 @@ const FireCaseDashboard = () => {
         </button>
       </div>
 
-      {/* Cases Table */}
       <div style={{ 
         backgroundColor: 'white',
         borderRadius: '8px',
@@ -291,7 +272,6 @@ const FireCaseDashboard = () => {
         )}
       </div>
 
-      {/* Preview Section */}
       {fireCases.length > 0 && (
         <div style={{ marginTop: '20px' }}>
           <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '10px' }}>
@@ -319,7 +299,6 @@ const FireCaseDashboard = () => {
   );
 };
 
-// Background handler for new cases
 const FireCaseEmailHandler = ({ onNewCase }) => {
   const [newCases, setNewCases] = useState([]);
 

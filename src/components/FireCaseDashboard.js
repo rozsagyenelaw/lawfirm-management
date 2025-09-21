@@ -10,7 +10,6 @@ const FireCaseDashboard = () => {
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [selectedCase, setSelectedCase] = useState(null);
 
   // Fetch fire case data with better error handling
   const fetchFireCaseData = async () => {
@@ -253,210 +252,232 @@ const FireCaseDashboard = () => {
               </thead>
               <tbody>
                 {fireCases.map((fireCase) => (
-                  <tr 
-                    key={fireCase.id} 
-                    style={{ 
-                      borderBottom: '1px solid #f0f0f0',
-                      cursor: 'pointer',
-                      backgroundColor: selectedCase?.id === fireCase.id ? '#f0f8ff' : 'white'
-                    }}
-                    onClick={() => setSelectedCase(fireCase)}
-                  >
-                    <td style={{ padding: '12px', fontSize: '14px' }}>
-                      {formatDate(fireCase.receivedDate || fireCase.timestamp)}
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        backgroundColor: fireCase.caseType?.includes('Eaton') ? '#fff3cd' : '#cfe2ff',
-                        color: fireCase.caseType?.includes('Eaton') ? '#856404' : '#004085'
-                      }}>
-                        {fireCase.caseType}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px', fontSize: '14px' }}>
-                      <div>
-                        {fireCase.from?.split('<')[0].trim() || 'Unknown'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px', fontSize: '14px', fontWeight: '500' }}>
-                      {fireCase.emailSubject}
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        backgroundColor: `${getPriorityColor(fireCase.priority)}20`,
-                        color: getPriorityColor(fireCase.priority)
-                      }}>
-                        {(fireCase.priority || 'normal').toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      {fireCase.attachmentCount > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Paperclip size={16} />
-                          <span style={{ fontSize: '14px' }}>{fireCase.attachmentCount}</span>
+                  <React.Fragment key={fireCase.id}>
+                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '12px', fontSize: '14px' }}>
+                        {formatDate(fireCase.receivedDate || fireCase.timestamp)}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          backgroundColor: fireCase.caseType?.includes('Eaton') ? '#fff3cd' : '#cfe2ff',
+                          color: fireCase.caseType?.includes('Eaton') ? '#856404' : '#004085'
+                        }}>
+                          {fireCase.caseType}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', fontSize: '14px' }}>
+                        <div>
+                          {fireCase.from?.split('<')[0].trim() || 'Unknown'}
                         </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <a
-                          href={fireCase.gmailLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#4285f4' }}
-                          title="Open in Gmail"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Mail size={18} />
-                        </a>
-                        {fireCase.documentFolderUrl && (
+                      </td>
+                      <td style={{ padding: '12px', fontSize: '14px', fontWeight: '500' }}>
+                        {fireCase.emailSubject}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          backgroundColor: `${getPriorityColor(fireCase.priority)}20`,
+                          color: getPriorityColor(fireCase.priority)
+                        }}>
+                          {(fireCase.priority || 'normal').toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {fireCase.attachmentCount > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Paperclip size={16} />
+                            <span style={{ fontSize: '14px' }}>{fireCase.attachmentCount}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
                           <a
-                            href={fireCase.documentFolderUrl}
+                            href={fireCase.gmailLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: '#34a853' }}
-                            title="Open Drive Folder"
-                            onClick={(e) => e.stopPropagation()}
+                            style={{ color: '#4285f4' }}
+                            title="Open in Gmail"
                           >
-                            <FolderOpen size={18} />
+                            <Mail size={18} />
                           </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {fireCase.documentFolderUrl && (
+                            <a
+                              href={fireCase.documentFolderUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#34a853' }}
+                              title="Open Drive Folder"
+                            >
+                              <FolderOpen size={18} />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Detailed AI Analysis Row */}
+                    <tr>
+                      <td colSpan="7" style={{ 
+                        padding: '15px', 
+                        backgroundColor: '#f8f9fa',
+                        borderBottom: '3px solid #dee2e6'
+                      }}>
+                        <div style={{ maxWidth: '900px' }}>
+                          {/* Detailed Summary */}
+                          <div style={{ marginBottom: '10px' }}>
+                            <strong style={{ color: '#333' }}>📝 Detailed Summary:</strong>
+                            <div style={{ 
+                              fontSize: '14px', 
+                              color: '#555', 
+                              marginTop: '5px',
+                              padding: '10px',
+                              backgroundColor: 'white',
+                              borderRadius: '4px',
+                              lineHeight: '1.6'
+                            }}>
+                              {fireCase.detailedSummary || fireCase.executiveSummary || 'AI analysis pending...'}
+                            </div>
+                          </div>
+
+                          {/* Action Items */}
+                          {fireCase.actionItems && fireCase.actionItems.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#dc3545' }}>⚡ Action Items:</strong>
+                              <ul style={{ margin: '5px 0 0 20px', color: '#dc3545', fontSize: '14px' }}>
+                                {fireCase.actionItems.map((item, idx) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Deadlines */}
+                          {fireCase.deadlines && fireCase.deadlines.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#ff6b6b' }}>📅 Deadlines:</strong>
+                              <ul style={{ margin: '5px 0 0 20px', color: '#ff6b6b', fontSize: '14px' }}>
+                                {fireCase.deadlines.map((deadline, idx) => (
+                                  <li key={idx}>
+                                    <strong>{deadline.date}:</strong> {deadline.description}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Legal Significance */}
+                          {fireCase.legalSignificance && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#333' }}>⚖️ Legal Significance:</strong>
+                              <div style={{ fontSize: '14px', color: '#555', marginTop: '5px' }}>
+                                {fireCase.legalSignificance}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Key Parties */}
+                          {fireCase.keyParties && fireCase.keyParties.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#333' }}>👥 Key Parties:</strong>
+                              <div style={{ fontSize: '14px', color: '#555', marginTop: '5px' }}>
+                                {fireCase.keyParties.join(', ')}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Next Steps */}
+                          {fireCase.nextSteps && fireCase.nextSteps.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#4285f4' }}>➡️ Recommended Next Steps:</strong>
+                              <ul style={{ margin: '5px 0 0 20px', color: '#4285f4', fontSize: '14px' }}>
+                                {fireCase.nextSteps.map((step, idx) => (
+                                  <li key={idx}>{step}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Evidence Value */}
+                          {fireCase.evidenceValue && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#333' }}>📊 Evidence Value:</strong>
+                              <div style={{ fontSize: '14px', color: '#555', marginTop: '5px' }}>
+                                {fireCase.evidenceValue}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Client Impact */}
+                          {fireCase.clientImpact && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <strong style={{ color: '#333' }}>👤 Client Impact:</strong>
+                              <div style={{ fontSize: '14px', color: '#555', marginTop: '5px' }}>
+                                {fireCase.clientImpact}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Attachments */}
+                          {fireCase.attachmentDriveLinks && fireCase.attachmentDriveLinks.length > 0 && (
+                            <div>
+                              <strong style={{ color: '#333' }}>📎 Documents in Drive:</strong>
+                              <div style={{ fontSize: '14px', marginTop: '5px' }}>
+                                {fireCase.attachmentDriveLinks.map((att, idx) => (
+                                  <a 
+                                    key={idx}
+                                    href={att.driveUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#4285f4', marginRight: '15px', textDecoration: 'none' }}
+                                  >
+                                    {att.name} ({att.size})
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Document Folder */}
+                          {fireCase.documentFolderUrl && (
+                            <div style={{ marginTop: '10px' }}>
+                              <a 
+                                href={fireCase.documentFolderUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                style={{ 
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '8px 12px',
+                                  backgroundColor: '#34a853',
+                                  color: 'white',
+                                  textDecoration: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '14px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                <FolderOpen size={16} />
+                                Open Document Folder
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
-
-      {/* Selected Case Details */}
-      {selectedCase && (
-        <div style={{ marginTop: '20px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '10px' }}>
-            AI Analysis Details
-          </h3>
-          <div style={{ 
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0'
-          }}>
-            {/* Executive Summary */}
-            <div style={{ marginBottom: '15px' }}>
-              <strong style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Executive Summary:</strong>
-              <div style={{ 
-                fontSize: '14px', 
-                color: '#666', 
-                padding: '10px',
-                backgroundColor: '#f0f8ff',
-                borderLeft: '3px solid #4285f4',
-                borderRadius: '4px'
-              }}>
-                {selectedCase.executiveSummary || 'No summary available'}
-              </div>
-            </div>
-
-            {/* Action Items */}
-            {selectedCase.actionItems && selectedCase.actionItems.length > 0 && (
-              <div style={{ marginBottom: '15px' }}>
-                <strong style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Action Items:</strong>
-                <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                  {selectedCase.actionItems.map((item, idx) => (
-                    <li key={idx} style={{ fontSize: '14px', color: '#666', marginBottom: '3px' }}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Deadlines */}
-            {selectedCase.deadlines && selectedCase.deadlines.length > 0 && (
-              <div style={{ marginBottom: '15px' }}>
-                <strong style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Deadlines:</strong>
-                <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                  {selectedCase.deadlines.map((deadline, idx) => (
-                    <li key={idx} style={{ fontSize: '14px', color: '#dc3545', marginBottom: '3px' }}>
-                      <strong>{deadline.date}:</strong> {deadline.description}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Attachments */}
-            {selectedCase.attachmentDriveLinks && selectedCase.attachmentDriveLinks.length > 0 && (
-              <div style={{ marginBottom: '15px' }}>
-                <strong style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Attachments in Drive:</strong>
-                <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                  {selectedCase.attachmentDriveLinks.map((attachment, idx) => (
-                    <li key={idx} style={{ fontSize: '14px', marginBottom: '3px' }}>
-                      <a 
-                        href={attachment.driveUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ color: '#4285f4' }}
-                      >
-                        {attachment.name} ({attachment.size})
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Legal Significance */}
-            {selectedCase.legalSignificance && (
-              <div style={{ marginBottom: '15px' }}>
-                <strong style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Legal Significance:</strong>
-                <div style={{ fontSize: '14px', color: '#666' }}>
-                  {selectedCase.legalSignificance}
-                </div>
-              </div>
-            )}
-
-            {/* Full Email Preview */}
-            <div style={{ marginBottom: '15px' }}>
-              <strong style={{ display: 'block', marginBottom: '5px', color: '#333' }}>Email Preview:</strong>
-              <div style={{ 
-                fontSize: '14px', 
-                color: '#666', 
-                padding: '10px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '4px',
-                maxHeight: '200px',
-                overflow: 'auto'
-              }}>
-                {selectedCase.bodyPreview || selectedCase.fullBody?.substring(0, 500)}...
-              </div>
-            </div>
-
-            {/* Close Button */}
-            <button
-              onClick={() => setSelectedCase(null)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Close Details
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

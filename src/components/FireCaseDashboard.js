@@ -3,7 +3,7 @@ import { AlertTriangle, Mail, Calendar, ExternalLink, Paperclip, FolderOpen } fr
 import toast from 'react-hot-toast';
 
 // Your Google Apps Script Web App URL
-const FIRE_MONITOR_API = 'https://script.google.com/macros/s/AKfycbyQ3AA4Q1xtPbLu3uClpavvAxnm-s4ApdtVm5KzW1M8_F9yvWQwZwgXyNGL_zSZrVxK5Q/exec';
+const FIRE_MONITOR_API = 'https://script.google.com/macros/s/AKfycbwriIVpp_Df-5Hj1GVpaIgdVudwf6sP6_DvTG648vark9k-3pccs8lc8MSSfNJiOrsv/exec';
 
 const FireCaseDashboard = () => {
   const [fireCases, setFireCases] = useState([]);

@@ -202,43 +202,91 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       if ((!analysisResult.deadlines || analysisResult.deadlines.length === 0) && text) {
         const extractedDeadlines = [];
         
-        // Look for dates in the document text
-        const datePatterns = [
-          // Pattern for "Description": "Date"
-          /"([^"]+[Dd]eadline[^"]*)"\s*:\s*"([A-Za-z]+ \d{1,2},? \d{4})"/g,
-          // Pattern for dates after colons
-          /([^:\n]+):\s*"?([A-Za-z]+ \d{1,2},? \d{4})"?/g,
-          // Pattern for standalone dates with context
-          /([^"\n]+)\s*[–-]\s*([A-Za-z]+ \d{1,2},? \d{4})/g
-        ];
+        // Look for dates in various formats within the text
+        // This regex finds dates in format "Month DD, YYYY"
+        const dateRegex = /([A-Z][a-z]+ \d{1,2},? \d{4})/g;
+        let dateMatch;
         
-        datePatterns.forEach(pattern => {
-          let match;
-          const regex = new RegExp(pattern);
-          while ((match = regex.exec(text)) !== null) {
-            const desc = match[1].trim().replace(/['"]/g, '');
-            const date = match[2].trim();
+        while ((dateMatch = dateRegex.exec(text)) !== null) {
+          const dateStr = dateMatch[1];
+          const dateIndex = dateMatch.index;
+          
+          // Get context around the date (100 chars before and after)
+          const contextStart = Math.max(0, dateIndex - 100);
+          const contextEnd = Math.min(text.length, dateIndex + dateStr.length + 100);
+          const context = text.substring(contextStart, contextEnd);
+          
+          // Check if this date appears to be a deadline
+          const deadlineKeywords = [
+            'deadline', 'due', 'by', 'no later than', 'before', 'until',
+            'must', 'shall', 'required', 'submit', 'file', 'complete',
+            'start', 'end', 'expire', 'cutoff', 'close'
+          ];
+          
+          const hasDeadlineContext = deadlineKeywords.some(keyword => 
+            context.toLowerCase().includes(keyword)
+          );
+          
+          if (hasDeadlineContext) {
+            // Extract a description from the context
+            let description = '';
             
-            // Only add if it looks like a deadline
-            if (desc.toLowerCase().includes('deadline') || 
-                desc.toLowerCase().includes('date') || 
-                desc.toLowerCase().includes('due') ||
-                desc.toLowerCase().includes('completion') ||
-                desc.toLowerCase().includes('start')) {
+            // Try to find the sentence or phrase containing the date
+            const sentences = context.split(/[.!?]/);
+            for (const sentence of sentences) {
+              if (sentence.includes(dateStr)) {
+                description = sentence.trim()
+                  .replace(/\s+/g, ' ')
+                  .replace(/^[^a-zA-Z]+/, '') // Remove leading non-letters
+                  .substring(0, 100); // Limit length
+                break;
+              }
+            }
+            
+            // Clean up the description
+            if (description) {
+              // Remove the date from the description to avoid redundancy
+              description = description.replace(dateStr, '').trim();
+              if (description.endsWith(',')) description = description.slice(0, -1);
               
-              // Check if not already added
-              if (!extractedDeadlines.find(d => d.date === date)) {
+              // Don't add duplicates
+              if (!extractedDeadlines.find(d => d.date === dateStr)) {
                 extractedDeadlines.push({
-                  description: desc,
-                  date: date
+                  description: description || 'Deadline',
+                  date: dateStr
                 });
               }
+            }
+          }
+        }
+        
+        // Also check if the text contains specific deadline patterns
+        const specificPatterns = [
+          /Plaintiff Fact Sheet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+          /Damages Questionnaire[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+          /Depositions? Start[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+          /Depositions? Complet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+          /filed[^.]*?no later than ([A-Z][a-z]+ \d{1,2},? \d{4})/i
+        ];
+        
+        specificPatterns.forEach(pattern => {
+          const match = text.match(pattern);
+          if (match && match[1]) {
+            const date = match[1];
+            const desc = match[0].replace(date, '').trim();
+            
+            if (!extractedDeadlines.find(d => d.date === date)) {
+              extractedDeadlines.push({
+                description: desc.substring(0, 100),
+                date: date
+              });
             }
           }
         });
         
         if (extractedDeadlines.length > 0) {
           analysisResult.deadlines = extractedDeadlines;
+          console.log('Extracted deadlines from text:', extractedDeadlines);
         }
       }
       

@@ -830,7 +830,20 @@ export const DataProvider = ({ children }) => {
   };
 
   const getClientDocuments = (clientId) => {
-    return documents.filter(doc => doc.clientId === clientId);
+    // First check if documents are stored in the separate documents collection
+    const separateDocs = documents.filter(doc => doc.clientId === clientId);
+    
+    // Also check if documents are stored directly on the client object
+    const client = clients.find(c => c.id === clientId);
+    const clientDocs = client?.documents || [];
+    
+    // Combine both sources and remove duplicates based on id
+    const allDocs = [...separateDocs, ...clientDocs];
+    const uniqueDocs = allDocs.filter((doc, index, self) => 
+      index === self.findIndex(d => d.id === doc.id)
+    );
+    
+    return uniqueDocs;
   };
 
   const getClientEvents = (clientId) => {
@@ -1121,4 +1134,3 @@ function getFormsLibrary() {
     }
   };
 }
-

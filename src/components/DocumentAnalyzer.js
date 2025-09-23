@@ -161,7 +161,60 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         throw new Error(data.error.message);
       }
 
-      const analysisResult = JSON.parse(data.choices[0].message.content);
+      // Get the AI response content
+      let content = data.choices[0].message.content;
+      console.log('Raw AI response:', content);
+      
+      // Try to parse the JSON response
+      let analysisResult;
+      try {
+        // First try direct parsing
+        analysisResult = JSON.parse(content);
+      } catch (e) {
+        // If that fails, try to extract JSON from the response
+        // The AI might have added text before/after the JSON
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            analysisResult = JSON.parse(jsonMatch[0]);
+          } catch (e2) {
+            console.error('Failed to parse extracted JSON:', e2);
+            // If still failing, try to manually extract deadlines
+            analysisResult = {
+              deadlines: [],
+              actionItems: [],
+              parties: [],
+              recommendations: []
+            };
+            
+            // Extract deadlines with multiple patterns
+            const deadlinePatterns = [
+              /"([^"]+)":\s*"([A-Za-z]+ \d{1,2}, \d{4})"/g,
+              /([A-Z][^":]+[Dd]eadline)":\s*"([A-Za-z]+ \d{1,2}, \d{4})"/g
+            ];
+            
+            deadlinePatterns.forEach(pattern => {
+              let match;
+              while ((match = pattern.exec(content)) !== null) {
+                analysisResult.deadlines.push({
+                  description: match[1].trim(),
+                  date: match[2].trim()
+                });
+              }
+            });
+          }
+        } else {
+          // Fall back to basic structure
+          analysisResult = {
+            deadlines: [],
+            actionItems: [],
+            parties: [],
+            recommendations: []
+          };
+        }
+      }
+      
+      console.log('Parsed analysis result:', analysisResult);
       setAnalysis(analysisResult);
       
       // Save to localStorage for this client

@@ -179,29 +179,13 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
             analysisResult = JSON.parse(jsonMatch[0]);
           } catch (e2) {
             console.error('Failed to parse extracted JSON:', e2);
-            // If still failing, try to manually extract deadlines
+            // If still failing, create a basic structure
             analysisResult = {
               deadlines: [],
               actionItems: [],
               parties: [],
               recommendations: []
             };
-            
-            // Extract deadlines with multiple patterns
-            const deadlinePatterns = [
-              /"([^"]+)":\s*"([A-Za-z]+ \d{1,2}, \d{4})"/g,
-              /([A-Z][^":]+[Dd]eadline)":\s*"([A-Za-z]+ \d{1,2}, \d{4})"/g
-            ];
-            
-            deadlinePatterns.forEach(pattern => {
-              let match;
-              while ((match = pattern.exec(content)) !== null) {
-                analysisResult.deadlines.push({
-                  description: match[1].trim(),
-                  date: match[2].trim()
-                });
-              }
-            });
           }
         } else {
           // Fall back to basic structure
@@ -211,6 +195,50 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
             parties: [],
             recommendations: []
           };
+        }
+      }
+      
+      // Now extract deadlines from the original document text if not found in AI response
+      if ((!analysisResult.deadlines || analysisResult.deadlines.length === 0) && text) {
+        const extractedDeadlines = [];
+        
+        // Look for dates in the document text
+        const datePatterns = [
+          // Pattern for "Description": "Date"
+          /"([^"]+[Dd]eadline[^"]*)"\s*:\s*"([A-Za-z]+ \d{1,2},? \d{4})"/g,
+          // Pattern for dates after colons
+          /([^:\n]+):\s*"?([A-Za-z]+ \d{1,2},? \d{4})"?/g,
+          // Pattern for standalone dates with context
+          /([^"\n]+)\s*[–-]\s*([A-Za-z]+ \d{1,2},? \d{4})/g
+        ];
+        
+        datePatterns.forEach(pattern => {
+          let match;
+          const regex = new RegExp(pattern);
+          while ((match = regex.exec(text)) !== null) {
+            const desc = match[1].trim().replace(/['"]/g, '');
+            const date = match[2].trim();
+            
+            // Only add if it looks like a deadline
+            if (desc.toLowerCase().includes('deadline') || 
+                desc.toLowerCase().includes('date') || 
+                desc.toLowerCase().includes('due') ||
+                desc.toLowerCase().includes('completion') ||
+                desc.toLowerCase().includes('start')) {
+              
+              // Check if not already added
+              if (!extractedDeadlines.find(d => d.date === date)) {
+                extractedDeadlines.push({
+                  description: desc,
+                  date: date
+                });
+              }
+            }
+          }
+        });
+        
+        if (extractedDeadlines.length > 0) {
+          analysisResult.deadlines = extractedDeadlines;
         }
       }
       

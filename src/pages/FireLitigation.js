@@ -3,11 +3,13 @@ import { FireCaseDashboard } from '../components/FireCaseDashboard';
 import { Flame, AlertTriangle, Calendar, Mail, FileText, Users, Clock, CheckCircle, AlertCircle, Download, RefreshCw } from 'lucide-react';
 import { format, isAfter, addDays, differenceInDays } from 'date-fns';
 import { useData } from '../context/DataContext';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DocumentAnalyzer from '../components/DocumentAnalyzer';
 
 const FireLitigation = () => {
   const { clients, addTask, addEvent, addDocument } = useData();
+  const navigate = useNavigate();
   
   const [activeCase, setActiveCase] = useState('all');
   const [emailSummaries, setEmailSummaries] = useState([]);
@@ -208,7 +210,9 @@ const FireLitigation = () => {
               activeCase === 'all' ? 'All Fire Clients' :
               activeCase === 'eaton' ? 'Eaton Fire Clients' : 
               'Pacific Palisades Clients'
-            } 
+            }
+            addEvent={addEvent}
+            navigate={navigate}
           />
         </div>
       )}

@@ -1,20 +1,14 @@
 import React, { useState } from 'react';
 import { Upload, FileText, AlertTriangle, CheckCircle, DollarSign, X, Loader, AlertCircle, Gavel, Search, Scale, Mail, Users, Camera, File, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
-import { useData } from '../context/DataContext';
 
-const DocumentAnalyzer = ({ clientId, clientName }) => {
+const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [fileName, setFileName] = useState('');
   const [documentText, setDocumentText] = useState('');
   const [documentType, setDocumentType] = useState('auto'); // auto-detect by default
-  
-  // Get navigation and data context
-  const navigate = useNavigate();
-  const { addEvent } = useData();
   
   // Your OpenAI API key from environment variable
   const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
@@ -796,12 +790,13 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
       }
       
       if (deadlinesToAdd.length === 0) {
-        toast.info('No deadlines found in this document');
+        // Use toast without .info method - just plain toast()
+        toast('No deadlines found in this document');
         return;
       }
 
       // Add events to the calendar system if addEvent is available
-      if (addEvent) {
+      if (typeof addEvent === 'function') {
         deadlinesToAdd.forEach(deadline => {
           try {
             // Parse the date and create a valid date object
@@ -832,7 +827,19 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
         
         if (addedToCalendarCount > 0) {
           toast.success(`${addedToCalendarCount} deadline(s) added to calendar!`);
+          
+          // Option to navigate to calendar
+          if (typeof navigate === 'function') {
+            setTimeout(() => {
+              if (window.confirm('Would you like to view the calendar now?')) {
+                navigate('/calendar');
+              }
+            }, 1000);
+          }
         }
+      } else {
+        // If addEvent is not available, just create the ICS file
+        console.log('addEvent function not available, creating ICS file only');
       }
       
       // Save deadlines to localStorage for calendar integration
@@ -866,7 +873,7 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
       // Save back to localStorage
       localStorage.setItem(calendarKey, JSON.stringify(existingDeadlines));
       
-      // Also create ICS file content for calendar import/export
+      // Create ICS file content for calendar import/export
       let icsContent = 'BEGIN:VCALENDAR\r\n';
       icsContent += 'VERSION:2.0\r\n';
       icsContent += 'PRODID:-//Law Firm//Document Analyzer//EN\r\n';
@@ -904,7 +911,7 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
       icsContent += 'END:VCALENDAR\r\n';
       
       // Ask user if they want to download ICS file as well
-      if (!addEvent || window.confirm('Would you also like to download an ICS file for backup or external calendar import?')) {
+      if (window.confirm('Would you also like to download an ICS file for backup or external calendar import?')) {
         // Create and download ICS file
         const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
         const url = window.URL.createObjectURL(blob);
@@ -924,18 +931,13 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
         toast.success(`ICS file downloaded with ${deadlinesToAdd.length} deadline(s)`);
       }
       
-      // Option to navigate to calendar
-      if (addEvent && addedToCalendarCount > 0) {
-        setTimeout(() => {
-          if (window.confirm('Would you like to view the calendar now?')) {
-            navigate('/calendar');
-          }
-        }, 1000);
+      if (!addEvent && deadlinesToAdd.length > 0) {
+        toast.success(`${deadlinesToAdd.length} deadline(s) saved to localStorage. ICS file available for calendar import.`);
       }
       
     } catch (error) {
       console.error('Error processing deadlines:', error);
-      toast.error('Failed to add deadlines to calendar. Please try again.');
+      toast.error('Failed to process deadlines. Please try again.');
     }
   };
 

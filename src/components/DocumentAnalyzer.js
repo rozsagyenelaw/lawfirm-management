@@ -624,6 +624,190 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
     return demoAnalyses[type] || demoAnalyses['other'];
   };
 
+  // Button handler functions
+  const handleSaveToClientFile = () => {
+    if (!analysis || !fileName) {
+      toast.error('No document analysis to save');
+      return;
+    }
+
+    try {
+      // Create a unique key for this client's documents
+      const clientDocKey = `client_${clientId}_documents`;
+      
+      // Get existing documents for this client
+      let existingDocs = localStorage.getItem(clientDocKey);
+      existingDocs = existingDocs ? JSON.parse(existingDocs) : [];
+      
+      // Create document entry
+      const documentEntry = {
+        id: Date.now(),
+        fileName: fileName,
+        documentType: documentType,
+        uploadDate: new Date().toISOString(),
+        analysis: analysis,
+        clientId: clientId,
+        clientName: clientName
+      };
+      
+      // Add to existing documents
+      existingDocs.push(documentEntry);
+      
+      // Save back to localStorage
+      localStorage.setItem(clientDocKey, JSON.stringify(existingDocs));
+      
+      // Also save to general document analysis storage
+      const generalKey = `document_analysis_${clientId}_${Date.now()}`;
+      localStorage.setItem(generalKey, JSON.stringify(documentEntry));
+      
+      toast.success(`Document saved to ${clientName}'s file`);
+    } catch (error) {
+      console.error('Error saving to client file:', error);
+      toast.error('Failed to save document to client file');
+    }
+  };
+
+  const handleEmailSummary = () => {
+    if (!analysis || !fileName) {
+      toast.error('No document analysis to email');
+      return;
+    }
+
+    try {
+      // Create email content
+      let emailSubject = `Document Analysis Summary: ${fileName}`;
+      let emailBody = `Document Analysis Summary\n`;
+      emailBody += `========================\n\n`;
+      emailBody += `Client: ${clientName}\n`;
+      emailBody += `Document: ${fileName}\n`;
+      emailBody += `Type: ${documentTypes.find(t => t.value === documentType)?.label}\n`;
+      emailBody += `Analysis Date: ${new Date().toLocaleDateString()}\n\n`;
+      
+      // Add key findings based on document type
+      emailBody += `KEY FINDINGS:\n`;
+      emailBody += `--------------\n`;
+      
+      // Add recommendations if they exist
+      if (analysis.recommendations && analysis.recommendations.length > 0) {
+        emailBody += `\nRECOMMENDATIONS:\n`;
+        analysis.recommendations.forEach((rec, i) => {
+          emailBody += `${i + 1}. ${rec}\n`;
+        });
+      }
+      
+      // Add deadlines if they exist
+      if (analysis.deadlines && analysis.deadlines.length > 0) {
+        emailBody += `\nIMPORTANT DEADLINES:\n`;
+        analysis.deadlines.forEach(deadline => {
+          emailBody += `- ${deadline.date}: ${deadline.description}\n`;
+        });
+      }
+      
+      // Add concerns if they exist
+      if (analysis.concerns && analysis.concerns.length > 0) {
+        emailBody += `\nCONCERNS:\n`;
+        analysis.concerns.forEach((concern, i) => {
+          emailBody += `${i + 1}. ${concern}\n`;
+        });
+      }
+      
+      // Encode for mailto link
+      const mailtoLink = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      
+      // Open default email client
+      window.open(mailtoLink);
+      
+      toast.success('Opening email client with summary');
+    } catch (error) {
+      console.error('Error creating email summary:', error);
+      toast.error('Failed to create email summary');
+    }
+  };
+
+  const handleAddDeadlinesToCalendar = () => {
+    if (!analysis) {
+      toast.error('No document analysis available');
+      return;
+    }
+
+    try {
+      let deadlinesToAdd = [];
+      
+      // Extract deadlines from analysis
+      if (analysis.deadlines && analysis.deadlines.length > 0) {
+        deadlinesToAdd = analysis.deadlines;
+      }
+      
+      // Also check for important dates (in contract analysis)
+      if (analysis.importantDates && analysis.importantDates.length > 0) {
+        deadlinesToAdd = [...deadlinesToAdd, ...analysis.importantDates];
+      }
+      
+      if (deadlinesToAdd.length === 0) {
+        toast.info('No deadlines found in this document');
+        return;
+      }
+      
+      // Save deadlines to localStorage for calendar integration
+      const calendarKey = `client_${clientId}_deadlines`;
+      let existingDeadlines = localStorage.getItem(calendarKey);
+      existingDeadlines = existingDeadlines ? JSON.parse(existingDeadlines) : [];
+      
+      // Add new deadlines
+      deadlinesToAdd.forEach(deadline => {
+        const calendarEntry = {
+          id: Date.now() + Math.random(),
+          clientId: clientId,
+          clientName: clientName,
+          date: deadline.date,
+          description: deadline.description,
+          source: fileName,
+          documentType: documentType,
+          addedOn: new Date().toISOString()
+        };
+        existingDeadlines.push(calendarEntry);
+      });
+      
+      // Save back to localStorage
+      localStorage.setItem(calendarKey, JSON.stringify(existingDeadlines));
+      
+      // Create ICS file content for calendar import
+      let icsContent = 'BEGIN:VCALENDAR\n';
+      icsContent += 'VERSION:2.0\n';
+      icsContent += 'PRODID:-//Law Firm//Document Analyzer//EN\n';
+      
+      deadlinesToAdd.forEach(deadline => {
+        const eventDate = new Date(deadline.date);
+        const dateStr = eventDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        
+        icsContent += 'BEGIN:VEVENT\n';
+        icsContent += `DTSTART:${dateStr}\n`;
+        icsContent += `SUMMARY:${clientName} - ${deadline.description}\n`;
+        icsContent += `DESCRIPTION:Source: ${fileName}\\nType: ${documentTypes.find(t => t.value === documentType)?.label}\n`;
+        icsContent += `UID:${Date.now()}${Math.random()}@lawfirm.com\n`;
+        icsContent += 'END:VEVENT\n';
+      });
+      
+      icsContent += 'END:VCALENDAR';
+      
+      // Create and download ICS file
+      const blob = new Blob([icsContent], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `deadlines_${clientName.replace(/\s/g, '_')}_${Date.now()}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`${deadlinesToAdd.length} deadline(s) prepared for calendar import`);
+    } catch (error) {
+      console.error('Error adding deadlines to calendar:', error);
+      toast.error('Failed to add deadlines to calendar');
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -1415,15 +1599,24 @@ const DocumentAnalyzer = ({ clientId, clientName }) => {
 
           {/* Action Buttons */}
           <div className="analysis-actions">
-            <button className="btn-primary">
+            <button 
+              className="btn-primary"
+              onClick={handleSaveToClientFile}
+            >
               <FileText size={18} />
-              Save to Case File
+              Save to Client's File
             </button>
-            <button className="btn-secondary">
+            <button 
+              className="btn-secondary"
+              onClick={handleEmailSummary}
+            >
               <Mail size={18} />
               Email Summary
             </button>
-            <button className="btn-secondary">
+            <button 
+              className="btn-secondary"
+              onClick={handleAddDeadlinesToCalendar}
+            >
               <Calendar size={18} />
               Add Deadlines to Calendar
             </button>

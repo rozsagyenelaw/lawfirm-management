@@ -86,21 +86,36 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       
       await page.render(renderContext).promise;
       
-      // Draw markers on current page
+      // Draw signature position marker (blue) if on current page
+      if (signaturePosition && signaturePosition.page === pageNum) {
+        const x = (signaturePosition.x / 612) * canvas.width;
+        const y = canvas.height - (((signaturePosition.y - 50) / 792) * canvas.height);
+        
+        context.fillStyle = 'rgba(0, 123, 255, 0.3)';
+        context.fillRect(x, y - 50, 150, 50);
+        context.strokeStyle = '#007bff';
+        context.lineWidth = 3;
+        context.strokeRect(x, y - 50, 150, 50);
+        
+        context.fillStyle = '#007bff';
+        context.font = 'bold 12px Arial';
+        context.fillText('You Sign Here', x + 5, y - 28);
+      }
+      
+      // Draw client markers (yellow) on current page
       markers.filter(m => m.page === pageNum).forEach(marker => {
-        const rect = canvas.getBoundingClientRect();
         const x = (marker.x / 612) * canvas.width;
-        const y = canvas.height - ((marker.y / 792) * canvas.height);
+        const y = canvas.height - (((marker.y - 50) / 792) * canvas.height);
         
         context.fillStyle = 'rgba(255, 235, 59, 0.3)';
-        context.fillRect(x, y - 30, 150, 50);
+        context.fillRect(x, y - 50, 150, 50);
         context.strokeStyle = '#FFC107';
-        context.lineWidth = 2;
-        context.strokeRect(x, y - 30, 150, 50);
+        context.lineWidth = 3;
+        context.strokeRect(x, y - 50, 150, 50);
         
         context.fillStyle = '#000';
-        context.font = '12px Arial';
-        context.fillText('Sign Here >', x + 5, y - 10);
+        context.font = 'bold 12px Arial';
+        context.fillText('Sign Here >', x + 5, y - 28);
       });
       
     } catch (error) {
@@ -117,17 +132,28 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Convert to PDF coordinates
+    // Convert canvas click to PDF coordinates
+    // Key fix: adjust for the 50px signature height offset
     const pdfX = (x / canvas.width) * 612;
-    const pdfY = 792 - ((y / canvas.height) * 792);
+    const pdfY = 792 - ((y / canvas.height) * 792) + 50; // Add 50 to compensate for signature height
     
     // Check if clicking on existing marker to drag
     const clickedMarker = markers.find(m => {
       if (m.page !== currentPage) return false;
       const markerX = (m.x / 612) * canvas.width;
-      const markerY = canvas.height - ((m.y / 792) * canvas.height);
+      const markerY = canvas.height - (((m.y - 50) / 792) * canvas.height);
       return x >= markerX && x <= markerX + 150 && y >= markerY - 50 && y <= markerY;
     });
+    
+    // Check if clicking on signature position marker
+    if (signaturePosition && signaturePosition.page === currentPage && !clickedMarker && !clickMode && !markMode) {
+      const sigMarkerX = (signaturePosition.x / 612) * canvas.width;
+      const sigMarkerY = canvas.height - (((signaturePosition.y - 50) / 792) * canvas.height);
+      if (x >= sigMarkerX && x <= sigMarkerX + 150 && y >= sigMarkerY - 50 && y <= sigMarkerY) {
+        setDraggingMarker({ ...signaturePosition, id: 'signature', isSignature: true });
+        return;
+      }
+    }
     
     if (clickedMarker && !clickMode && !markMode) {
       setDraggingMarker(clickedMarker);
@@ -135,36 +161,26 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
     
     if (markMode) {
-      // Add marker for client
       const newMarker = {
         x: Math.round(pdfX),
         y: Math.round(pdfY),
         page: currentPage,
-        id: Date.now()
+        id: Date.now(),
+        type: 'client'
       };
       setMarkers([...markers, newMarker]);
       setMarkMode(false);
-      toast.success('Signature field marked - you can drag it to adjust position');
+      toast.success('Client signature field marked - drag to adjust position');
       renderPage(currentPage);
     } else if (clickMode) {
-      // Set position for your signature
       setSignaturePosition({
         x: Math.round(pdfX),
         y: Math.round(pdfY),
         page: currentPage
       });
       setClickMode(false);
-      toast.success(`Your signature position set on page ${currentPage}`);
-      
-      // Draw a marker
-      const ctx = canvas.getContext('2d');
-      const markerX = x;
-      const markerY = y;
-      ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
-      ctx.fillRect(markerX, markerY - 50, 150, 50);
-      ctx.strokeStyle = '#007bff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(markerX, markerY - 50, 150, 50);
+      toast.success('Your signature position set - drag the blue box to adjust');
+      renderPage(currentPage);
     }
   };
 
@@ -177,24 +193,35 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Convert to PDF coordinates
     const pdfX = (x / canvas.width) * 612;
-    const pdfY = 792 - ((y / canvas.height) * 792);
+    const pdfY = 792 - ((y / canvas.height) * 792) + 50;
     
-    // Update marker position
-    const updatedMarkers = markers.map(m => 
-      m.id === draggingMarker.id 
-        ? { ...m, x: Math.round(pdfX), y: Math.round(pdfY) }
-        : m
-    );
-    setMarkers(updatedMarkers);
-    setDraggingMarker({ ...draggingMarker, x: Math.round(pdfX), y: Math.round(pdfY) });
+    if (draggingMarker.isSignature) {
+      setSignaturePosition({
+        x: Math.round(pdfX),
+        y: Math.round(pdfY),
+        page: currentPage
+      });
+      setDraggingMarker({ ...draggingMarker, x: Math.round(pdfX), y: Math.round(pdfY) });
+    } else {
+      const updatedMarkers = markers.map(m => 
+        m.id === draggingMarker.id 
+          ? { ...m, x: Math.round(pdfX), y: Math.round(pdfY) }
+          : m
+      );
+      setMarkers(updatedMarkers);
+      setDraggingMarker({ ...draggingMarker, x: Math.round(pdfX), y: Math.round(pdfY) });
+    }
     renderPage(currentPage);
   };
 
   const handleCanvasMouseUp = () => {
     if (draggingMarker) {
-      toast.success('Marker position updated');
+      if (draggingMarker.isSignature) {
+        toast.success('Your signature position updated');
+      } else {
+        toast.success('Client marker position updated');
+      }
       setDraggingMarker(null);
     }
   };
@@ -582,7 +609,36 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   fontSize: '12px',
                   marginBottom: '5px'
                 }}>
-                  ✓ Your signature position set (page {signaturePosition.page})
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <strong>✓ Your signature position (page {signaturePosition.page})</strong>
+                      <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                        X={signaturePosition.x}, Y={signaturePosition.y} • Drag blue box to adjust
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSignaturePosition(null);
+                        renderPage(currentPage);
+                        toast.info('Signature position cleared');
+                      }}
+                      style={{
+                        padding: '2px 6px',
+                        background: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '10px'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
               )}
 

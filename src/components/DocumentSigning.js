@@ -7,44 +7,86 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { Save, RotateCcw, X, Send, Eye, Copy, MapPin, Tag, Move } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
+import * as pdfjsLib from 'pdfjs-dist/webpack';
 
 const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) => {
   const [signatureData, setSignatureData] = useState(null);
   const [isSigning, setIsSigning] = useState(false);
   const [signingLinkGenerated, setSigningLinkGenerated] = useState(null);
-  const [signatureBox, setSignatureBox] = useState(null); // {x, y, width, height, page}
-  const [clientBoxes, setClientBoxes] = useState([]); // Array of boxes for clients
+  const [signatureBox, setSignatureBox] = useState(null);
+  const [clientBoxes, setClientBoxes] = useState([]);
   const [draggedBox, setDraggedBox] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [pageImageUrl, setPageImageUrl] = useState(null);
-  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pdfDoc, setPdfDoc] = useState(null);
   
   const signaturePadRef = useRef(null);
-  const pdfContainerRef = useRef(null);
-  const pdfDocRef = useRef(null);
+  const canvasRef = useRef(null);
+  const containerRef = useRef(null);
 
-  // Detect total pages from PDF URL
+  // Load PDF on mount
   useEffect(() => {
-    const loadPdfInfo = async () => {
-      try {
-        const url = document.url;
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
-        const pages = pdfDoc.getPages();
-        setTotalPages(pages.length);
-      } catch (error) {
-        console.error('Error loading PDF info:', error);
-        setTotalPages(1);
-      }
-    };
-    
-    loadPdfInfo();
+    loadPDF();
   }, [document.url]);
+
+  // Render page when currentPage changes
+  useEffect(() => {
+    if (pdfDoc && currentPage) {
+      renderPage(currentPage);
+    }
+  }, [currentPage, pdfDoc]);
+
+  const loadPDF = async () => {
+    try {
+      const url = document.url;
+      const pathMatch = url.match(/\/o\/(.+?)\?/);
+      
+      if (!pathMatch) {
+        throw new Error('Could not extract path from URL');
+      }
+      
+      const encodedPath = pathMatch[1];
+      const decodedPath = decodeURIComponent(encodedPath);
+      
+      const storageRef = ref(storage, decodedPath);
+      const blob = await getBlob(storageRef);
+      const arrayBuffer = await blob.arrayBuffer();
+      
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      setPdfDoc(pdf);
+      setTotalPages(pdf.numPages);
+      
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      toast.error('Failed to load PDF preview');
+    }
+  };
+
+  const renderPage = async (pageNum) => {
+    if (!pdfDoc || !canvasRef.current) return;
+    
+    try {
+      const page = await pdfDoc.getPage(pageNum);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      const viewport = page.getViewport({ scale: 1.5 });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport
+      };
+      
+      await page.render(renderContext).promise;
+      
+    } catch (error) {
+      console.error('Error rendering page:', error);
+    }
+  };
 
   const clearSignature = () => {
     if (signaturePadRef.current) {
@@ -63,30 +105,34 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
   };
 
-  const handlePdfClick = (e) => {
-    const container = pdfContainerRef.current;
-    if (!container) return;
+  const handleCanvasClick = (e) => {
+    if (signatureBox && signatureBox.page === currentPage) return; // Already placed on this page
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const rect = container.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Create a signature box at click position
     const box = {
-      x: x - 75, // Center the 150px box on click
-      y: y - 25, // Center the 50px box on click
+      x: x - 75,
+      y: y - 25,
       width: 150,
       height: 50,
-      page: currentPage // Assign to current page being viewed
+      page: currentPage
     };
 
     setSignatureBox(box);
-    toast.success('Drag the blue box to position it exactly!');
+    toast.success(`Signature box placed on page ${currentPage} - drag to adjust!`);
   };
 
   const handleMouseDown = (e, box, isClient = false) => {
     e.stopPropagation();
-    const rect = pdfContainerRef.current.getBoundingClientRect();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
     setDraggedBox({ box, isClient });
     setDragOffset({
       x: e.clientX - rect.left - box.x,
@@ -95,9 +141,9 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   };
 
   const handleMouseMove = (e) => {
-    if (!draggedBox || !pdfContainerRef.current) return;
+    if (!draggedBox || !canvasRef.current) return;
 
-    const rect = pdfContainerRef.current.getBoundingClientRect();
+    const rect = canvasRef.current.getBoundingClientRect();
     const newX = e.clientX - rect.left - dragOffset.x;
     const newY = e.clientY - rect.top - dragOffset.y;
 
@@ -118,30 +164,30 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
 
   const handleMouseUp = () => {
     if (draggedBox) {
-      toast.success('Position set!');
+      toast.success('Position updated!');
     }
     setDraggedBox(null);
   };
 
   const addClientBox = () => {
-    const container = pdfContainerRef.current;
-    if (!container) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
       toast.error('Please wait for PDF to load');
       return;
     }
 
-    const rect = container.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const box = {
       id: Date.now(),
       x: rect.width / 2 - 75,
       y: rect.height / 2 - 25,
       width: 150,
       height: 50,
-      page: currentPage // Assign to current page
+      page: currentPage
     };
 
     setClientBoxes([...clientBoxes, box]);
-    toast.success('Yellow box added - drag it to position');
+    toast.success(`Client box added to page ${currentPage} - drag to position`);
   };
 
   const removeClientBox = (id) => {
@@ -149,15 +195,13 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     toast.success('Removed');
   };
 
-  const convertToPdfCoordinates = (box, pdfWidth, pdfHeight, containerWidth, containerHeight) => {
-    // Convert from screen/container pixels to PDF points
-    const scaleX = pdfWidth / containerWidth;
-    const scaleY = pdfHeight / containerHeight;
+  const convertToPdfCoordinates = (box, pdfWidth, pdfHeight, canvasWidth, canvasHeight) => {
+    const scaleX = pdfWidth / canvasWidth;
+    const scaleY = pdfHeight / canvasHeight;
     
-    // PDF coordinates: Y starts at bottom
     return {
       x: box.x * scaleX,
-      y: pdfHeight - (box.y * scaleY) - (box.height * scaleY), // Flip Y and account for box height
+      y: pdfHeight - (box.y * scaleY) - (box.height * scaleY),
       width: box.width * scaleX,
       height: box.height * scaleY
     };
@@ -170,21 +214,15 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
 
     if (!signatureBox) {
-      toast.error('Please click on the PDF to place your signature');
+      toast.error('Please click on the document to place your signature');
       return;
     }
 
     setIsSigning(true);
     
     try {
-      // Get PDF
       const url = document.url;
       const pathMatch = url.match(/\/o\/(.+?)\?/);
-      
-      if (!pathMatch) {
-        throw new Error('Could not extract storage path from URL');
-      }
-      
       const encodedPath = pathMatch[1];
       const decodedPath = decodeURIComponent(encodedPath);
       
@@ -194,14 +232,14 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pages = pdfDoc.getPages();
-      const page = pages[0]; // For now, first page
-      const { width, height } = page.getSize();
       
-      // Get container dimensions for conversion
-      const container = pdfContainerRef.current;
-      const rect = container.getBoundingClientRect();
+      const pageIndex = signatureBox.page - 1;
+      const targetPage = pages[pageIndex];
+      const { width, height } = targetPage.getSize();
       
-      // Convert box position to PDF coordinates
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      
       const pdfCoords = convertToPdfCoordinates(
         signatureBox,
         width,
@@ -209,44 +247,35 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         rect.width,
         rect.height
       );
-
-      console.log('Container dimensions:', rect.width, rect.height);
-      console.log('PDF dimensions:', width, height);
-      console.log('Box position (screen):', signatureBox);
-      console.log('Box position (PDF):', pdfCoords);
       
-      // Embed signature
       const signatureImageBytes = signatureData.split(',')[1];
       const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
       const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
       
-      page.drawImage(signatureImage, {
+      targetPage.drawImage(signatureImage, {
         x: pdfCoords.x,
         y: pdfCoords.y,
         width: pdfCoords.width,
         height: pdfCoords.height,
       });
       
-      // Add text below signature
-      page.drawText(`${clientName}`, {
+      targetPage.drawText(`${clientName}`, {
         x: pdfCoords.x,
         y: pdfCoords.y - 15,
         size: 10,
         color: rgb(0, 0, 0),
       });
       
-      page.drawText(`Signed: ${new Date().toLocaleDateString()}`, {
+      targetPage.drawText(`Signed: ${new Date().toLocaleDateString()}`, {
         x: pdfCoords.x,
         y: pdfCoords.y - 30,
         size: 8,
         color: rgb(0.3, 0.3, 0.3),
       });
       
-      // Save signed PDF
       const signedPdfBytes = await pdfDoc.save();
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
-      // Upload to Firebase
       const timestamp = Date.now();
       const signedFileName = `${clientId}/signed/${timestamp}-${document.name}`;
       const storageRef2 = ref(storage, `client-documents/${signedFileName}`);
@@ -254,7 +283,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       const snapshot = await uploadBytes(storageRef2, signedBlob);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
-      // Save metadata
       const signedDocData = {
         id: timestamp.toString(),
         name: `SIGNED-${document.name}`,
@@ -268,10 +296,9 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         originalDocId: document.id,
         signedBy: clientName,
         signedAt: new Date().toISOString(),
-        signaturePosition: pdfCoords
+        signaturePosition: signatureBox
       };
       
-      // Update client documents
       const clientRef = doc(db, 'clients', clientId);
       await updateDoc(clientRef, {
         documents: arrayUnion(signedDocData)
@@ -311,16 +338,17 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       const blob = await getBlob(storageRef);
       const pdfBytes = await blob.arrayBuffer();
       
-      const pdfDoc = await PDFDocument.load(pdfBytes);
-      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const pages = pdfDoc.getPages();
-      const page = pages[0];
-      const { width, height } = page.getSize();
+      const pdfDocLib = await PDFDocument.load(pdfBytes);
+      const helveticaFont = await pdfDocLib.embedFont(StandardFonts.Helvetica);
+      const pages = pdfDocLib.getPages();
       
-      const container = pdfContainerRef.current;
-      const rect = container.getBoundingClientRect();
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
       
       clientBoxes.forEach(box => {
+        const page = pages[box.page - 1];
+        const { width, height } = page.getSize();
+        
         const pdfCoords = convertToPdfCoordinates(box, width, height, rect.width, rect.height);
         
         page.drawRectangle({
@@ -343,7 +371,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         });
       });
       
-      const markedPdfBytes = await pdfDoc.save();
+      const markedPdfBytes = await pdfDocLib.save();
       const markedBlob = new Blob([markedPdfBytes], { type: 'application/pdf' });
       
       const timestamp = Date.now();
@@ -462,28 +490,15 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between',
-                marginBottom: '10px',
+                marginBottom: '15px',
                 padding: '10px',
-                background: '#fff3cd',
-                border: '1px solid #ffc107',
+                background: '#f8f9fa',
                 borderRadius: '4px'
               }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '5px' }}>
-                    📄 Working with Page {currentPage} of {totalPages}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#856404' }}>
-                    Signature boxes will be placed on page {currentPage}. The viewer shows page 1, but your signature will be embedded on the correct page.
-                  </div>
-                </div>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                   style={{
-                    flex: 1,
                     padding: '8px 15px',
                     background: currentPage === 1 ? '#ccc' : '#007bff',
                     color: 'white',
@@ -493,13 +508,15 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     fontWeight: '500'
                   }}
                 >
-                  ← Page {currentPage - 1}
+                  Previous
                 </button>
+                <span style={{ fontWeight: '500', fontSize: '14px' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
                 <button
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                   style={{
-                    flex: 1,
                     padding: '8px 15px',
                     background: currentPage === totalPages ? '#ccc' : '#007bff',
                     color: 'white',
@@ -509,21 +526,21 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     fontWeight: '500'
                   }}
                 >
-                  Page {currentPage + 1} →
+                  Next
                 </button>
               </div>
 
               <button 
-                onClick={handlePdfClick}
-                disabled={!!signatureBox}
+                onClick={handleCanvasClick}
+                disabled={signatureBox && signatureBox.page === currentPage}
                 style={{
                   width: '100%',
                   padding: '10px',
-                  background: signatureBox ? '#28a745' : '#007bff',
+                  background: (signatureBox && signatureBox.page === currentPage) ? '#28a745' : '#007bff',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: signatureBox ? 'not-allowed' : 'pointer',
+                  cursor: (signatureBox && signatureBox.page === currentPage) ? 'not-allowed' : 'pointer',
                   marginBottom: '10px',
                   display: 'flex',
                   alignItems: 'center',
@@ -533,7 +550,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 }}
               >
                 <MapPin size={18} />
-                {signatureBox ? `✓ Your Signature on Page ${signatureBox.page}` : 'Click PDF to Place Your Signature'}
+                {(signatureBox && signatureBox.page === currentPage) ? `✓ Your Signature on Page ${currentPage}` : `Click PDF to Place Your Signature (Page ${currentPage})`}
               </button>
 
               <button 
@@ -554,7 +571,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 }}
               >
                 <Tag size={18} />
-                Add Client Signature Field (Page {currentPage})
+                Add Client Field (Page {currentPage})
               </button>
 
               {signatureBox && (
@@ -586,14 +603,10 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                       Remove
                     </button>
                   </div>
-                  {signatureBox.page === currentPage ? (
+                  {signatureBox.page === currentPage && (
                     <div style={{ fontSize: '12px', marginTop: '5px', color: '#155724' }}>
                       <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
                       Drag the blue box to adjust
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', marginTop: '5px', color: '#856404' }}>
-                      Go to page {signatureBox.page} to adjust position
                     </div>
                   )}
                 </div>
@@ -611,85 +624,62 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   <div style={{ fontWeight: '500', marginBottom: '5px' }}>
                     {clientBoxes.length} client field{clientBoxes.length > 1 ? 's' : ''}
                   </div>
-                  {clientBoxes.filter(b => b.page === currentPage).length > 0 ? (
-                    clientBoxes.filter(b => b.page === currentPage).map(box => (
-                      <div key={box.id} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginTop: '5px',
-                        padding: '5px',
-                        background: 'white',
-                        borderRadius: '3px'
-                      }}>
-                        <span style={{ fontSize: '12px' }}>
-                          <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
-                          Drag yellow box
-                        </span>
-                        <button
-                          onClick={() => removeClientBox(box.id)}
-                          style={{
-                            padding: '2px 6px',
-                            background: '#dc3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            fontSize: '10px'
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{ fontSize: '12px', color: '#856404', marginTop: '5px' }}>
-                      No fields on this page. Navigate to other pages to see fields.
+                  {clientBoxes.filter(b => b.page === currentPage).map(box => (
+                    <div key={box.id} style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: '5px',
+                      padding: '5px',
+                      background: 'white',
+                      borderRadius: '3px'
+                    }}>
+                      <span style={{ fontSize: '12px' }}>
+                        <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
+                        Drag yellow box
+                      </span>
+                      <button
+                        onClick={() => removeClientBox(box.id)}
+                        style={{
+                          padding: '2px 6px',
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '10px'
+                        }}
+                      >
+                        Remove
+                      </button>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
             
             <div 
-              ref={pdfContainerRef}
-              onClick={handlePdfClick}
+              ref={containerRef}
+              onClick={handleCanvasClick}
               style={{
                 position: 'relative',
                 border: '2px solid #ddd',
                 borderRadius: '8px',
                 overflow: 'hidden',
-                minHeight: '500px',
                 background: '#f5f5f5',
-                cursor: draggedBox ? 'grabbing' : (signatureBox ? 'default' : 'crosshair')
+                cursor: draggedBox ? 'grabbing' : 'crosshair'
               }}
             >
-              <iframe
-                key={`pdf-page-${currentPage}`}
-                src={document.url}
+              <canvas
+                ref={canvasRef}
                 style={{
                   width: '100%',
-                  height: '500px',
-                  border: 'none',
-                  pointerEvents: 'none'
-                }}
-                title="PDF Preview"
-                onLoad={() => {
-                  // Try to navigate to page after load
-                  console.log('PDF loaded, current page:', currentPage);
+                  height: 'auto',
+                  display: 'block'
                 }}
               />
-              <div style={{
-                textAlign: 'center',
-                fontSize: '12px',
-                marginTop: '5px',
-                color: '#666',
-                fontStyle: 'italic'
-              }}>
-                Note: PDF viewer may not change pages. Use "Open Full Document" below to view all pages.
-              </div>
               
-              {/* Your signature box (blue) - only show on current page */}
+              {/* Your signature box (blue) - only on current page */}
               {signatureBox && signatureBox.page === currentPage && (
                 <div
                   onMouseDown={(e) => handleMouseDown(e, signatureBox, false)}
@@ -717,7 +707,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 </div>
               )}
               
-              {/* Client boxes (yellow) - only show on current page */}
+              {/* Client boxes (yellow) - only on current page */}
               {clientBoxes.filter(box => box.page === currentPage).map(box => (
                 <div
                   key={box.id}

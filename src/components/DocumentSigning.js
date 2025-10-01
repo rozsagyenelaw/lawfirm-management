@@ -18,9 +18,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [pageImageUrl, setPageImageUrl] = useState(null);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
   
   const signaturePadRef = useRef(null);
   const pdfContainerRef = useRef(null);
+  const pdfDocRef = useRef(null);
 
   // Detect total pages from PDF URL
   useEffect(() => {
@@ -651,7 +654,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               }}
             >
               <iframe
-                src={`${document.url}#page=${currentPage}&toolbar=0`}
+                key={currentPage}
+                src={`${document.url}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0`}
                 style={{
                   width: '100%',
                   height: '500px',

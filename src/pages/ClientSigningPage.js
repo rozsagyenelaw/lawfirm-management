@@ -85,8 +85,9 @@ const ClientSigningPage = () => {
     setIsSigning(true);
 
     try {
-      // Get the PDF to sign
-      const pdfUrl = session.documentUrl;
+      // IMPORTANT: Use the ORIGINAL document URL, not the marked one
+      // The marked document has yellow boxes, we want to sign the original
+      const pdfUrl = session.originalUrl || session.documentUrl;
       const response = await fetch(pdfUrl);
       const pdfBlob = await response.blob();
       const pdfBytes = await pdfBlob.arrayBuffer();
@@ -94,39 +95,46 @@ const ClientSigningPage = () => {
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pages = pdfDoc.getPages();
       
+      const signatureImageBytes = signatureData.split(',')[1];
+      const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
+      const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
+      
       // If there are markers (yellow boxes), use their positions
       if (session.markers && session.markers.length > 0) {
-        const signatureImageBytes = signatureData.split(',')[1];
-        const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
-        const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
-        
         // Add signature to each marker position
         session.markers.forEach(marker => {
           const page = pages[marker.page - 1];
-          const { width, height } = page.getSize();
+          const { width: pdfWidth, height: pdfHeight } = page.getSize();
           
-          // Convert screen coordinates to PDF coordinates
-          // Assuming marker coordinates are already in PDF space
-          const x = marker.x || 100;
-          const y = marker.y || 100;
+          // The marker coordinates are in PDF space already (from createMarkedDocumentForClient)
+          // But we need to adjust for the coordinate system difference
+          // PDF coordinates start at bottom-left, our markers are from top-left
           
+          const x = marker.x;
+          const y = marker.y;
+          const markerWidth = marker.width;
+          const markerHeight = marker.height;
+          
+          // Place signature exactly where the yellow box was
           page.drawImage(signatureImage, {
             x: x,
-            y: y - 50,
-            width: 150,
-            height: 50,
+            y: y,
+            width: markerWidth,
+            height: markerHeight,
           });
           
+          // Add client name below signature
           page.drawText(session.clientName, {
             x: x,
-            y: y - 65,
+            y: y - 15,
             size: 10,
             color: rgb(0, 0, 0),
           });
           
+          // Add date stamp
           page.drawText(`Signed: ${new Date().toLocaleDateString()}`, {
             x: x,
-            y: y - 80,
+            y: y - 30,
             size: 8,
             color: rgb(0.3, 0.3, 0.3),
           });
@@ -135,10 +143,6 @@ const ClientSigningPage = () => {
         // No markers - place signature at default location (bottom of first page)
         const firstPage = pages[0];
         const { width, height } = firstPage.getSize();
-        
-        const signatureImageBytes = signatureData.split(',')[1];
-        const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
-        const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
         
         firstPage.drawImage(signatureImage, {
           x: 50,
@@ -388,14 +392,43 @@ const ClientSigningPage = () => {
             >
               Open Full Document in New Tab
             </button>
+            
+            {/* Scroll indicator */}
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              background: '#fff3cd',
+              border: '2px solid #ffc107',
+              borderRadius: '8px',
+              textAlign: 'center',
+              fontSize: '16px',
+              fontWeight: '500',
+              color: '#856404'
+            }}>
+              👇 Scroll down to sign the document 👇
+            </div>
           </div>
 
           {/* Signature Section */}
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ margin: '0 0 15px', color: '#333' }}>Your Signature</h3>
-            <p style={{ margin: '0 0 15px', color: '#666', fontSize: '14px' }}>
-              Please draw your signature in the box below:
-            </p>
+          <div style={{ marginBottom: '30px', scrollMarginTop: '20px' }} id="signature-section">
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '20px',
+              borderRadius: '8px 8px 0 0',
+              marginBottom: 0
+            }}>
+              <h3 style={{ margin: 0, color: 'white', fontSize: '24px' }}>✍️ Sign Here</h3>
+            </div>
+            <div style={{
+              border: '3px solid #667eea',
+              borderTop: 'none',
+              borderRadius: '0 0 8px 8px',
+              padding: '20px',
+              background: 'white'
+            }}>
+              <p style={{ margin: '0 0 15px', color: '#666', fontSize: '14px' }}>
+                Please draw your signature in the box below:
+              </p>
             
             <div style={{
               border: '2px solid #667eea',
@@ -452,6 +485,7 @@ const ClientSigningPage = () => {
                 />
               </div>
             )}
+            </div>
           </div>
 
           {/* Sign Button */}

@@ -259,7 +259,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const removeMarker = (markerId) => {
     setMarkers(markers.filter(m => m.id !== markerId));
     renderPage(currentPage);
-    toast.info('Marker removed');
+    toast.success('Marker removed');
   };
 
   const clearSignature = () => {
@@ -286,7 +286,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
 
     try {
-      toast.info('Creating marked document for client...');
+      toast.success('Creating marked document for client...');
       
       // Get PDF
       const url = document.url;
@@ -593,7 +593,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     if (!clickMode) {
                       renderPage(currentPage);
                     }
-                    toast.info(clickMode ? 'Click mode disabled' : 'Click where YOU want to sign');
+                    toast.success(clickMode ? 'Click mode disabled' : 'Click where YOU want to sign');
                   }}
                   style={{
                     padding: '10px',
@@ -613,7 +613,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   onClick={() => {
                     setMarkMode(!markMode);
                     setClickMode(false);
-                    toast.info(markMode ? 'Mark mode disabled' : 'Click where CLIENT should sign');
+                    toast.success(markMode ? 'Mark mode disabled' : 'Click where CLIENT should sign');
                   }}
                   style={{
                     padding: '10px',
@@ -654,7 +654,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                       onClick={() => {
                         setSignaturePosition(null);
                         renderPage(currentPage);
-                        toast.info('Signature position cleared');
+                        toast.success('Signature position cleared');
                       }}
                       style={{
                         padding: '2px 6px',

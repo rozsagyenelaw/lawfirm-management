@@ -90,7 +90,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       // Draw signature position marker (blue) if on current page
       if (signaturePosition && signaturePosition.page === pageNum) {
         const x = (signaturePosition.x / 612) * canvas.width;
-        const y = canvas.height - (((signaturePosition.y - 50) / 792) * canvas.height);
+        const y = canvas.height - ((signaturePosition.y / 792) * canvas.height);
         
         context.fillStyle = 'rgba(0, 123, 255, 0.3)';
         context.fillRect(x, y - 50, 150, 50);
@@ -106,7 +106,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       // Draw client markers (yellow) on current page
       markers.filter(m => m.page === pageNum).forEach(marker => {
         const x = (marker.x / 612) * canvas.width;
-        const y = canvas.height - (((marker.y - 50) / 792) * canvas.height);
+        const y = canvas.height - ((marker.y / 792) * canvas.height);
         
         context.fillStyle = 'rgba(255, 235, 59, 0.3)';
         context.fillRect(x, y - 50, 150, 50);
@@ -134,22 +134,23 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     const y = e.clientY - rect.top;
     
     // Convert canvas click to PDF coordinates
-    // Key fix: adjust for the 50px signature height offset
+    // PDF Y starts at bottom (0) and goes up to top (792)
+    // Canvas Y starts at top (0) and goes down
     const pdfX = (x / canvas.width) * 612;
-    const pdfY = 792 - ((y / canvas.height) * 792) + 50; // Add 50 to compensate for signature height
+    const pdfY = 792 - ((y / canvas.height) * 792); // Direct conversion, no offset yet
     
     // Check if clicking on existing marker to drag
     const clickedMarker = markers.find(m => {
       if (m.page !== currentPage) return false;
       const markerX = (m.x / 612) * canvas.width;
-      const markerY = canvas.height - (((m.y - 50) / 792) * canvas.height);
+      const markerY = canvas.height - ((m.y / 792) * canvas.height);
       return x >= markerX && x <= markerX + 150 && y >= markerY - 50 && y <= markerY;
     });
     
     // Check if clicking on signature position marker
     if (signaturePosition && signaturePosition.page === currentPage && !clickedMarker && !clickMode && !markMode) {
       const sigMarkerX = (signaturePosition.x / 612) * canvas.width;
-      const sigMarkerY = canvas.height - (((signaturePosition.y - 50) / 792) * canvas.height);
+      const sigMarkerY = canvas.height - ((signaturePosition.y / 792) * canvas.height);
       if (x >= sigMarkerX && x <= sigMarkerX + 150 && y >= sigMarkerY - 50 && y <= sigMarkerY) {
         setDraggingMarker({ ...signaturePosition, id: 'signature', isSignature: true });
         return;
@@ -198,7 +199,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     
     if (draggingMarker) {
       const pdfX = (x / canvas.width) * 612;
-      const pdfY = 792 - ((y / canvas.height) * 792) + 50;
+      const pdfY = 792 - ((y / canvas.height) * 792);
       
       if (draggingMarker.isSignature) {
         setSignaturePosition({
@@ -216,7 +217,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         setMarkers(updatedMarkers);
         setDraggingMarker({ ...draggingMarker, x: Math.round(pdfX), y: Math.round(pdfY) });
       }
-      renderPage(currentPage);
+      // Don't call renderPage during drag - only on mouse up
     } else if (!clickMode && !markMode) {
       // Check if hovering over any marker
       let isHovering = false;
@@ -224,7 +225,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       // Check signature position marker
       if (signaturePosition && signaturePosition.page === currentPage) {
         const sigMarkerX = (signaturePosition.x / 612) * canvas.width;
-        const sigMarkerY = canvas.height - (((signaturePosition.y - 50) / 792) * canvas.height);
+        const sigMarkerY = canvas.height - ((signaturePosition.y / 792) * canvas.height);
         if (x >= sigMarkerX && x <= sigMarkerX + 150 && y >= sigMarkerY - 50 && y <= sigMarkerY) {
           isHovering = true;
         }
@@ -235,7 +236,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         const hoveredMarker = markers.find(m => {
           if (m.page !== currentPage) return false;
           const markerX = (m.x / 612) * canvas.width;
-          const markerY = canvas.height - (((m.y - 50) / 792) * canvas.height);
+          const markerY = canvas.height - ((m.y / 792) * canvas.height);
           return x >= markerX && x <= markerX + 150 && y >= markerY - 50 && y <= markerY;
         });
         isHovering = !!hoveredMarker;
@@ -253,6 +254,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         toast.success('Client marker position updated');
       }
       setDraggingMarker(null);
+      // Re-render after drag completes
+      setTimeout(() => renderPage(currentPage), 0);
     }
   };
 

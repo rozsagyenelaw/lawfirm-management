@@ -106,14 +106,16 @@ const ClientSigningPage = () => {
           const page = pages[marker.page - 1];
           const { width: pdfWidth, height: pdfHeight } = page.getSize();
           
-          // The marker coordinates are in PDF space already (from createMarkedDocumentForClient)
-          // But we need to adjust for the coordinate system difference
-          // PDF coordinates start at bottom-left, our markers are from top-left
-          
           const x = marker.x;
           const y = marker.y;
           const markerWidth = marker.width;
           const markerHeight = marker.height;
+          
+          console.log('===== CLIENT SIGNING DEBUG =====');
+          console.log('PDF Page Size:', pdfWidth, 'x', pdfHeight);
+          console.log('Marker from database:', marker);
+          console.log('Placing signature at:', { x, y, width: markerWidth, height: markerHeight });
+          console.log('================================');
           
           // Place signature exactly where the yellow box was
           page.drawImage(signatureImage, {

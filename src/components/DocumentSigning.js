@@ -28,11 +28,13 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const renderTimeoutRef = useRef(null);
 
   const triggerRender = () => {
+    console.log('triggerRender called');
     // Debounce renders to prevent conflicts
     if (renderTimeoutRef.current) {
       clearTimeout(renderTimeoutRef.current);
     }
     renderTimeoutRef.current = setTimeout(() => {
+      console.log('About to render page:', currentPage);
       if (pdfDoc && currentPage) {
         renderPage(currentPage);
       }
@@ -84,6 +86,10 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const renderPage = async (pageNum) => {
     if (!pdfDoc || !canvasRef.current) return;
     
+    console.log('renderPage called for page:', pageNum);
+    console.log('signaturePosition:', signaturePosition);
+    console.log('markers:', markers);
+    
     try {
       const page = await pdfDoc.getPage(pageNum);
       const canvas = canvasRef.current;
@@ -100,10 +106,14 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       
       await page.render(renderContext).promise;
       
+      console.log('PDF rendered, now drawing markers');
+      
       // Draw signature position marker (blue) if on current page
       if (signaturePosition && signaturePosition.page === pageNum) {
         const x = (signaturePosition.x / 612) * canvas.width;
         const y = canvas.height - ((signaturePosition.y / 792) * canvas.height);
+        
+        console.log('Drawing blue signature box at:', x, y);
         
         context.fillStyle = 'rgba(0, 123, 255, 0.3)';
         context.fillRect(x, y - 50, 150, 50);
@@ -121,6 +131,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         const x = (marker.x / 612) * canvas.width;
         const y = canvas.height - ((marker.y / 792) * canvas.height);
         
+        console.log('Drawing yellow marker at:', x, y);
+        
         context.fillStyle = 'rgba(255, 235, 59, 0.3)';
         context.fillRect(x, y - 50, 150, 50);
         context.strokeStyle = '#FFC107';
@@ -131,6 +143,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         context.font = 'bold 12px Arial';
         context.fillText('Sign Here >', x + 5, y - 28);
       });
+      
+      console.log('Finished drawing all markers');
       
     } catch (error) {
       console.error('Error rendering page:', error);
@@ -146,11 +160,15 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    console.log('Canvas clicked at:', x, y);
+    
     // Convert canvas click to PDF coordinates
     // PDF Y starts at bottom (0) and goes up to top (792)
     // Canvas Y starts at top (0) and goes down
     const pdfX = (x / canvas.width) * 612;
     const pdfY = 792 - ((y / canvas.height) * 792); // Direct conversion, no offset yet
+    
+    console.log('PDF coordinates:', pdfX, pdfY);
     
     // Check if clicking on existing marker to drag
     const clickedMarker = markers.find(m => {
@@ -188,13 +206,17 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       toast.success('Client signature field marked - drag to adjust position');
       triggerRender();
     } else if (clickMode) {
-      setSignaturePosition({
+      console.log('ClickMode active - setting signature position');
+      const newPosition = {
         x: Math.round(pdfX),
         y: Math.round(pdfY),
         page: currentPage
-      });
+      };
+      console.log('New position:', newPosition);
+      setSignaturePosition(newPosition);
       setClickMode(false);
       toast.success('Your signature position set - drag the blue box to adjust');
+      console.log('Calling triggerRender');
       triggerRender();
     }
   };

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { storage, db } from '../config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, getBlob } from 'firebase/storage';
 import { doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
@@ -102,21 +102,39 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     
     try {
       console.log('Starting signature process...');
-      console.log('Document URL:', document.url);
+      console.log('Document path:', document.path);
       
-      // Fetch PDF with better error handling
+      // NEW METHOD: Use Firebase getBlob to bypass CORS
       let pdfBytes;
-      try {
-        const response = await fetch(document.url);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch PDF: ${response.status}`);
+      
+      if (document.path) {
+        // If we have the storage path, use it directly
+        console.log('Fetching from Firebase Storage using path...');
+        const storageRef = ref(storage, document.path);
+        const blob = await getBlob(storageRef);
+        pdfBytes = await blob.arrayBuffer();
+        console.log('PDF fetched via Firebase Storage API');
+      } else {
+        // Fallback: try to extract path from URL
+        console.log('Extracting path from URL...');
+        const url = document.url;
+        
+        // Extract path from Firebase Storage URL
+        // Format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media
+        const pathMatch = url.match(/\/o\/(.+?)\?/);
+        
+        if (pathMatch) {
+          const encodedPath = pathMatch[1];
+          const decodedPath = decodeURIComponent(encodedPath);
+          console.log('Extracted path:', decodedPath);
+          
+          const storageRef = ref(storage, decodedPath);
+          const blob = await getBlob(storageRef);
+          pdfBytes = await blob.arrayBuffer();
+          console.log('PDF fetched via extracted path');
+        } else {
+          throw new Error('Could not extract storage path from URL');
         }
-        pdfBytes = await response.arrayBuffer();
-        console.log('PDF fetched successfully');
-      } catch (fetchError) {
-        console.error('Fetch error:', fetchError);
-        toast.error('Cannot access the PDF. It may be stored in a restricted location.');
-        throw fetchError;
       }
       
       const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -218,6 +236,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     } catch (error) {
       console.error('Error signing document:', error);
       console.error('Error details:', error.message);
+      console.error('Error stack:', error.stack);
       toast.error(`Failed to sign document: ${error.message}`);
     } finally {
       setIsSigning(false);

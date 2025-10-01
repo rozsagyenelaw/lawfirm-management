@@ -655,7 +655,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
             >
               <iframe
                 key={currentPage}
-                src={`${document.url}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0`}
+                src={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(document.url)}&page=${currentPage}`}
                 style={{
                   width: '100%',
                   height: '500px',
@@ -825,15 +825,21 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               {isSigning ? 'Signing...' : 'Sign & Save Document'}
             </button>
 
-            <div style={{ padding: '15px', background: '#f8f9fa', borderRadius: '4px' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '10px' }}>Send to Client</h4>
+            <div style={{ padding: '15px', background: '#e7f3ff', border: '2px solid #007bff', borderRadius: '4px' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#007bff' }}>📧 Send to Client for Signature</h4>
+              
+              <p style={{ fontSize: '13px', marginBottom: '10px', color: '#333' }}>
+                {clientBoxes.length > 0 
+                  ? `✓ You've marked ${clientBoxes.length} signature field(s). Send the marked document to your client.`
+                  : 'Add yellow signature fields above, then send the marked document to your client. Or send unmarked.'}
+              </p>
               
               {clientBoxes.length > 0 ? (
                 <button 
                   onClick={createMarkedDocumentForClient}
                   style={{
                     width: '100%',
-                    padding: '10px',
+                    padding: '12px',
                     background: '#FFC107',
                     color: '#000',
                     border: 'none',
@@ -844,18 +850,19 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     justifyContent: 'center',
                     gap: '8px',
                     marginBottom: '10px',
-                    fontWeight: '500'
+                    fontWeight: '600',
+                    fontSize: '14px'
                   }}
                 >
-                  <Send size={16} />
-                  Send Marked Document
+                  <Send size={18} />
+                  Send Marked Document to Client
                 </button>
               ) : (
                 <button 
                   onClick={createSigningSession}
                   style={{
                     width: '100%',
-                    padding: '10px',
+                    padding: '12px',
                     background: '#17a2b8',
                     color: 'white',
                     border: 'none',
@@ -865,16 +872,21 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    marginBottom: '10px'
+                    marginBottom: '10px',
+                    fontWeight: '600',
+                    fontSize: '14px'
                   }}
                 >
-                  <Send size={16} />
+                  <Send size={18} />
                   Send Unmarked Document
                 </button>
               )}
               
               {signingLinkGenerated && (
-                <div>
+                <div style={{ marginTop: '10px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '5px' }}>
+                    Signing Link (share this with your client):
+                  </label>
                   <input 
                     type="text" 
                     value={signingLinkGenerated} 
@@ -885,7 +897,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                       borderRadius: '4px',
                       border: '1px solid #ddd',
                       marginBottom: '8px',
-                      fontSize: '12px'
+                      fontSize: '11px',
+                      background: 'white'
                     }}
                   />
                   <button 
@@ -896,7 +909,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     style={{
                       width: '100%',
                       padding: '8px',
-                      background: '#6c757d',
+                      background: '#28a745',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
@@ -904,11 +917,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      fontWeight: '500'
                     }}
                   >
                     <Copy size={14} />
-                    Copy Link
+                    Copy Link to Clipboard
                   </button>
                 </div>
               )}

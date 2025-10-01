@@ -3,8 +3,8 @@ import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL, getBlob } from 'firebase/storage';
 import { doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import SignatureCanvas from 'react-signature-canvas';
-import { PDFDocument, rgb } from 'pdf-lib';
-import { Save, RotateCcw, X, Send, Eye, Copy, MapPin } from 'lucide-react';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { Save, RotateCcw, X, Send, Eye, Copy, MapPin, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import * as pdfjsLib from 'pdfjs-dist/webpack';
@@ -15,9 +15,11 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [signingLinkGenerated, setSigningLinkGenerated] = useState(null);
   const [signaturePosition, setSignaturePosition] = useState(null);
   const [clickMode, setClickMode] = useState(false);
+  const [markMode, setMarkMode] = useState(false);
   const [pdfPages, setPdfPages] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfDoc, setPdfDoc] = useState(null);
+  const [markers, setMarkers] = useState([]);
   
   const signaturePadRef = useRef(null);
   const canvasRef = useRef(null);
@@ -30,11 +32,10 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     if (pdfDoc && currentPage) {
       renderPage(currentPage);
     }
-  }, [currentPage, pdfDoc]);
+  }, [currentPage, pdfDoc, markers]);
 
   const loadPDF = async () => {
     try {
-      // Extract path and get blob
       const url = document.url;
       const pathMatch = url.match(/\/o\/(.+?)\?/);
       
@@ -83,45 +84,74 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       };
       
       await page.render(renderContext).promise;
+      
+      // Draw markers on current page
+      markers.filter(m => m.page === pageNum).forEach(marker => {
+        const rect = canvas.getBoundingClientRect();
+        const x = (marker.x / 612) * canvas.width;
+        const y = canvas.height - ((marker.y / 792) * canvas.height);
+        
+        context.fillStyle = 'rgba(255, 235, 59, 0.3)';
+        context.fillRect(x, y - 30, 150, 50);
+        context.strokeStyle = '#FFC107';
+        context.lineWidth = 2;
+        context.strokeRect(x, y - 30, 150, 50);
+        
+        context.fillStyle = '#000';
+        context.font = '12px Arial';
+        context.fillText('Sign Here >', x + 5, y - 10);
+      });
+      
     } catch (error) {
       console.error('Error rendering page:', error);
     }
   };
 
   const handleCanvasClick = (e) => {
-    if (!clickMode || !canvasRef.current) return;
+    if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     
-    // Get click position relative to canvas
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Get canvas dimensions
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
+    // Convert to PDF coordinates
+    const pdfX = (x / canvas.width) * 612;
+    const pdfY = 792 - ((y / canvas.height) * 792);
     
-    // Convert to PDF coordinates (standard letter: 612 x 792)
-    const pdfX = (x / rect.width) * 612;
-    const pdfY = 792 - ((y / rect.height) * 792); // Invert Y axis
-    
-    setSignaturePosition({
-      x: Math.round(pdfX),
-      y: Math.round(pdfY),
-      page: currentPage
-    });
-    
-    setClickMode(false);
-    toast.success(`Signature position set on page ${currentPage}`);
-    
-    // Draw a marker on canvas
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
-    ctx.fillRect(x, y, 100, 30);
-    ctx.strokeStyle = '#007bff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, 100, 30);
+    if (markMode) {
+      // Add marker for client
+      const newMarker = {
+        x: Math.round(pdfX),
+        y: Math.round(pdfY),
+        page: currentPage,
+        id: Date.now()
+      };
+      setMarkers([...markers, newMarker]);
+      setMarkMode(false);
+      toast.success('Signature field marked for client');
+      renderPage(currentPage);
+    } else if (clickMode) {
+      // Set position for your signature
+      setSignaturePosition({
+        x: Math.round(pdfX),
+        y: Math.round(pdfY),
+        page: currentPage
+      });
+      setClickMode(false);
+      toast.success(`Your signature position set on page ${currentPage}`);
+      
+      // Draw a marker
+      const ctx = canvas.getContext('2d');
+      const markerX = x;
+      const markerY = y;
+      ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
+      ctx.fillRect(markerX, markerY - 30, 150, 50);
+      ctx.strokeStyle = '#007bff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(markerX, markerY - 30, 150, 50);
+    }
   };
 
   const clearSignature = () => {
@@ -138,6 +168,96 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       toast.success('Signature captured');
     } else {
       toast.error('Please provide a signature');
+    }
+  };
+
+  const createMarkedDocumentForClient = async () => {
+    if (markers.length === 0) {
+      toast.error('Please mark at least one signature location first');
+      return;
+    }
+
+    try {
+      toast.info('Creating marked document for client...');
+      
+      // Get PDF
+      const url = document.url;
+      const pathMatch = url.match(/\/o\/(.+?)\?/);
+      const encodedPath = pathMatch[1];
+      const decodedPath = decodeURIComponent(encodedPath);
+      
+      const storageRef = ref(storage, decodedPath);
+      const blob = await getBlob(storageRef);
+      const pdfBytes = await blob.arrayBuffer();
+      
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      
+      // Add markers to PDF
+      markers.forEach(marker => {
+        const page = pdfDoc.getPages()[marker.page - 1];
+        
+        // Draw yellow box
+        page.drawRectangle({
+          x: marker.x,
+          y: marker.y - 50,
+          width: 150,
+          height: 50,
+          borderColor: rgb(1, 0.76, 0.03),
+          borderWidth: 2,
+          color: rgb(1, 0.92, 0.23),
+          opacity: 0.3,
+        });
+        
+        // Add text
+        page.drawText('Sign Here >', {
+          x: marker.x + 5,
+          y: marker.y - 30,
+          size: 12,
+          font: helveticaFont,
+          color: rgb(0, 0, 0),
+        });
+      });
+      
+      const markedPdfBytes = await pdfDoc.save();
+      const markedBlob = new Blob([markedPdfBytes], { type: 'application/pdf' });
+      
+      // Upload marked PDF
+      const timestamp = Date.now();
+      const markedFileName = `${clientId}/marked/${timestamp}-${document.name}`;
+      const markedStorageRef = ref(storage, `client-documents/${markedFileName}`);
+      
+      await uploadBytes(markedStorageRef, markedBlob);
+      const markedURL = await getDownloadURL(markedStorageRef);
+      
+      // Create signing session with marked document
+      const sessionId = uuidv4();
+      const signingData = {
+        sessionId,
+        documentId: document.id,
+        documentName: document.name,
+        documentUrl: markedURL,
+        originalUrl: document.url,
+        clientId,
+        clientName,
+        status: 'pending',
+        markers: markers,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      };
+
+      await setDoc(doc(db, 'signingSessions', sessionId), signingData);
+      
+      const signingLink = `${window.location.origin}/sign/${sessionId}`;
+      setSigningLinkGenerated(signingLink);
+      
+      navigator.clipboard.writeText(signingLink);
+      toast.success('Marked document created! Signing link copied to clipboard');
+      
+      return signingLink;
+    } catch (error) {
+      console.error('Error creating marked document:', error);
+      toast.error('Failed to create marked document');
     }
   };
 
@@ -185,16 +305,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     setIsSigning(true);
     
     try {
-      console.log('Starting signature process...');
-      
-      // Extract path from URL
       const url = document.url;
       const pathMatch = url.match(/\/o\/(.+?)\?/);
-      
-      if (!pathMatch) {
-        throw new Error('Could not extract storage path from URL');
-      }
-      
       const encodedPath = pathMatch[1];
       const decodedPath = decodeURIComponent(encodedPath);
       
@@ -205,33 +317,21 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pages = pdfDoc.getPages();
       
-      // Get the selected page
       const pageIndex = signaturePosition.page - 1;
-      
-      if (pageIndex < 0 || pageIndex >= pages.length) {
-        throw new Error(`Invalid page number`);
-      }
-      
       const targetPage = pages[pageIndex];
-      const { width, height } = targetPage.getSize();
-      
-      console.log(`Signing page ${signaturePosition.page}, size: ${width}x${height}`);
-      console.log(`Position: X=${signaturePosition.x}, Y=${signaturePosition.y}`);
       
       // Convert signature to bytes
       const signatureImageBytes = signatureData.split(',')[1];
       const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
       
-      // Embed signature
       const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
       
-      // Signature dimensions
       const sigWidth = 150;
       const sigHeight = 50;
       
-      // Use exact coordinates
+      // Adjusted: Place signature AT the Y coordinate, not below it
       const sigX = signaturePosition.x;
-      const sigY = signaturePosition.y - sigHeight; // Adjust for signature height
+      const sigY = signaturePosition.y - sigHeight; // Signature box starts here
       
       targetPage.drawImage(signatureImage, {
         x: sigX,
@@ -240,7 +340,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         height: sigHeight,
       });
       
-      // Add text below signature
       targetPage.drawText(`${clientName}`, {
         x: sigX,
         y: sigY - 15,
@@ -255,11 +354,9 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         color: rgb(0.3, 0.3, 0.3),
       });
       
-      // Save the signed PDF
       const signedPdfBytes = await pdfDoc.save();
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
-      // Upload to Firebase
       const timestamp = Date.now();
       const signedFileName = `${clientId}/signed/${timestamp}-${document.name}`;
       const storageRef2 = ref(storage, `client-documents/${signedFileName}`);
@@ -267,7 +364,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       const snapshot = await uploadBytes(storageRef2, signedBlob);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
-      // Save metadata
       const signedDocData = {
         id: timestamp.toString(),
         name: `SIGNED-${document.name}`,
@@ -284,15 +380,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         signaturePosition: signaturePosition
       };
       
-      // Update client documents
       const clientRef = doc(db, 'clients', clientId);
       await updateDoc(clientRef, {
         documents: arrayUnion(signedDocData)
       });
       
       toast.success('Document signed and saved!');
-      
-      // Open signed document in new tab
       window.open(downloadURL, '_blank');
       
       if (onSigned) {
@@ -384,54 +477,84 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 </button>
               </div>
               
-              <button 
-                onClick={() => {
-                  setClickMode(!clickMode);
-                  if (!clickMode) {
-                    renderPage(currentPage); // Re-render to clear markers
-                  }
-                  toast.info(clickMode ? 'Click mode disabled' : 'Click on the document where you want to place the signature');
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 15px',
-                  background: clickMode ? '#dc3545' : '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginBottom: '10px'
-                }}
-              >
-                <MapPin size={18} />
-                {clickMode ? 'Cancel Selection' : 'Click to Select Position'}
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <button 
+                  onClick={() => {
+                    setClickMode(!clickMode);
+                    setMarkMode(false);
+                    if (!clickMode) {
+                      renderPage(currentPage);
+                    }
+                    toast.info(clickMode ? 'Click mode disabled' : 'Click where YOU want to sign');
+                  }}
+                  style={{
+                    padding: '10px',
+                    background: clickMode ? '#dc3545' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  <MapPin size={16} style={{ display: 'inline', marginRight: '5px' }} />
+                  {clickMode ? 'Cancel' : 'Sign Here (You)'}
+                </button>
+
+                <button 
+                  onClick={() => {
+                    setMarkMode(!markMode);
+                    setClickMode(false);
+                    toast.info(markMode ? 'Mark mode disabled' : 'Click where CLIENT should sign');
+                  }}
+                  style={{
+                    padding: '10px',
+                    background: markMode ? '#dc3545' : '#FFC107',
+                    color: markMode ? 'white' : '#000',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  <Tag size={16} style={{ display: 'inline', marginRight: '5px' }} />
+                  {markMode ? 'Cancel' : 'Mark for Client'}
+                </button>
+              </div>
 
               {signaturePosition && (
                 <div style={{
-                  padding: '10px',
+                  padding: '8px',
                   background: '#d4edda',
                   border: '1px solid #c3e6cb',
                   borderRadius: '4px',
-                  fontSize: '14px',
-                  marginBottom: '10px'
+                  fontSize: '12px',
+                  marginBottom: '5px'
                 }}>
-                  ✓ Signature position set on page {signaturePosition.page}
+                  ✓ Your signature position set (page {signaturePosition.page})
+                </div>
+              )}
+
+              {markers.length > 0 && (
+                <div style={{
+                  padding: '8px',
+                  background: '#fff3cd',
+                  border: '1px solid #ffc107',
+                  borderRadius: '4px',
+                  fontSize: '12px'
+                }}>
+                  {markers.length} signature field(s) marked for client
                 </div>
               )}
             </div>
             
             <div style={{
-              border: clickMode ? '3px solid #007bff' : '2px solid #ddd',
+              border: (clickMode || markMode) ? '3px solid ' + (clickMode ? '#007bff' : '#FFC107') : '2px solid #ddd',
               borderRadius: '8px',
               overflow: 'auto',
               maxHeight: '500px',
               background: '#f5f5f5',
-              cursor: clickMode ? 'crosshair' : 'default'
+              cursor: (clickMode || markMode) ? 'crosshair' : 'default'
             }}>
               <canvas
                 ref={canvasRef}
@@ -448,6 +571,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               onClick={() => window.open(document.url, '_blank')}
               style={{
                 marginTop: '10px',
+                width: '100%',
                 padding: '8px 15px',
                 background: '#6c757d',
                 color: 'white',
@@ -456,6 +580,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px'
               }}
             >
@@ -537,36 +662,61 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px'
+                gap: '8px',
+                marginBottom: '10px'
               }}
             >
               <Save size={20} />
-              {isSigning ? 'Signing Document...' : 'Sign & Save Document'}
+              {isSigning ? 'Signing...' : 'Sign & Save (You)'}
             </button>
 
-            <div style={{ marginTop: '30px', padding: '15px', background: '#f8f9fa', borderRadius: '4px' }}>
-              <h4 style={{ marginTop: 0 }}>Send to Client</h4>
-              <p style={{ fontSize: '14px', color: '#666' }}>Generate a signing link for your client:</p>
-              <button 
-                onClick={createSigningSession}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  background: '#17a2b8',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginBottom: '10px'
-                }}
-              >
-                <Send size={16} />
-                Generate Signing Link
-              </button>
+            <div style={{ padding: '15px', background: '#f8f9fa', borderRadius: '4px' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '10px' }}>Send to Client</h4>
+              
+              {markers.length > 0 ? (
+                <button 
+                  onClick={createMarkedDocumentForClient}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: '#FFC107',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginBottom: '10px',
+                    fontWeight: '500'
+                  }}
+                >
+                  <Send size={16} />
+                  Send Marked Document to Client
+                </button>
+              ) : (
+                <button 
+                  onClick={createSigningSession}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginBottom: '10px'
+                  }}
+                >
+                  <Send size={16} />
+                  Send Unmarked Document
+                </button>
+              )}
               
               {signingLinkGenerated && (
                 <div>

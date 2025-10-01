@@ -20,6 +20,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfDoc, setPdfDoc] = useState(null);
   const [markers, setMarkers] = useState([]);
+  const [draggingMarker, setDraggingMarker] = useState(null);
   
   const signaturePadRef = useRef(null);
   const canvasRef = useRef(null);
@@ -120,6 +121,19 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     const pdfX = (x / canvas.width) * 612;
     const pdfY = 792 - ((y / canvas.height) * 792);
     
+    // Check if clicking on existing marker to drag
+    const clickedMarker = markers.find(m => {
+      if (m.page !== currentPage) return false;
+      const markerX = (m.x / 612) * canvas.width;
+      const markerY = canvas.height - ((m.y / 792) * canvas.height);
+      return x >= markerX && x <= markerX + 150 && y >= markerY - 50 && y <= markerY;
+    });
+    
+    if (clickedMarker && !clickMode && !markMode) {
+      setDraggingMarker(clickedMarker);
+      return;
+    }
+    
     if (markMode) {
       // Add marker for client
       const newMarker = {
@@ -130,7 +144,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       };
       setMarkers([...markers, newMarker]);
       setMarkMode(false);
-      toast.success('Signature field marked for client');
+      toast.success('Signature field marked - you can drag it to adjust position');
       renderPage(currentPage);
     } else if (clickMode) {
       // Set position for your signature
@@ -147,11 +161,48 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       const markerX = x;
       const markerY = y;
       ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
-      ctx.fillRect(markerX, markerY - 30, 150, 50);
+      ctx.fillRect(markerX, markerY - 50, 150, 50);
       ctx.strokeStyle = '#007bff';
       ctx.lineWidth = 2;
-      ctx.strokeRect(markerX, markerY - 30, 150, 50);
+      ctx.strokeRect(markerX, markerY - 50, 150, 50);
     }
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!draggingMarker || !canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Convert to PDF coordinates
+    const pdfX = (x / canvas.width) * 612;
+    const pdfY = 792 - ((y / canvas.height) * 792);
+    
+    // Update marker position
+    const updatedMarkers = markers.map(m => 
+      m.id === draggingMarker.id 
+        ? { ...m, x: Math.round(pdfX), y: Math.round(pdfY) }
+        : m
+    );
+    setMarkers(updatedMarkers);
+    setDraggingMarker({ ...draggingMarker, x: Math.round(pdfX), y: Math.round(pdfY) });
+    renderPage(currentPage);
+  };
+
+  const handleCanvasMouseUp = () => {
+    if (draggingMarker) {
+      toast.success('Marker position updated');
+      setDraggingMarker(null);
+    }
+  };
+
+  const removeMarker = (markerId) => {
+    setMarkers(markers.filter(m => m.id !== markerId));
+    renderPage(currentPage);
+    toast.info('Marker removed');
   };
 
   const clearSignature = () => {
@@ -543,7 +594,41 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   borderRadius: '4px',
                   fontSize: '12px'
                 }}>
-                  {markers.length} signature field(s) marked for client
+                  <strong>{markers.length} signature field(s) marked for client</strong>
+                  {markers.filter(m => m.page === currentPage).length > 0 && (
+                    <div style={{ marginTop: '5px' }}>
+                      {markers.filter(m => m.page === currentPage).map(marker => (
+                        <div key={marker.id} style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          marginTop: '3px',
+                          padding: '3px',
+                          background: 'white',
+                          borderRadius: '3px'
+                        }}>
+                          <span>Page {marker.page}: X={marker.x}, Y={marker.y}</span>
+                          <button
+                            onClick={() => removeMarker(marker.id)}
+                            style={{
+                              padding: '2px 6px',
+                              background: '#dc3545',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              fontSize: '10px'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <div style={{ marginTop: '5px', fontSize: '11px', color: '#666' }}>
+                        💡 Drag markers to reposition them
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -554,11 +639,14 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               overflow: 'auto',
               maxHeight: '500px',
               background: '#f5f5f5',
-              cursor: (clickMode || markMode) ? 'crosshair' : 'default'
+              cursor: (clickMode || markMode) ? 'crosshair' : draggingMarker ? 'grabbing' : 'default'
             }}>
               <canvas
                 ref={canvasRef}
                 onClick={handleCanvasClick}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
                 style={{
                   width: '100%',
                   height: 'auto',

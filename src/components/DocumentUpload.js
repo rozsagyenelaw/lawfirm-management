@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
-import { Upload, FileText, Download, Trash2, Eye } from 'lucide-react';
+import { Upload, FileText, Download, Trash2, Eye, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DocumentSigning from './DocumentSigning';
 
 const DocumentUpload = ({ clientId, clientName }) => {
   const [uploading, setUploading] = useState(false);
   const [documents, setDocuments] = useState([]);
+  const [signingDocument, setSigningDocument] = useState(null);
   
   useEffect(() => {
     const loadDocuments = async () => {
@@ -190,6 +192,13 @@ const DocumentUpload = ({ clientId, clientName }) => {
                     <Download size={16} />
                   </button>
                   <button
+                    onClick={() => setSigningDocument(doc)}
+                    className="btn-icon"
+                    title="Sign Document"
+                  >
+                    <PenTool size={16} />
+                  </button>
+                  <button
                     onClick={() => handleDelete(doc)}
                     className="btn-icon danger"
                     title="Delete"
@@ -202,6 +211,19 @@ const DocumentUpload = ({ clientId, clientName }) => {
           )}
         </div>
       </div>
+      
+      {signingDocument && (
+        <DocumentSigning
+          document={signingDocument}
+          clientId={clientId}
+          clientName={clientName}
+          onClose={() => setSigningDocument(null)}
+          onSigned={(signedDoc) => {
+            setDocuments([...documents, signedDoc]);
+            setSigningDocument(null);
+          }}
+        />
+      )}
     </div>
   );
 };

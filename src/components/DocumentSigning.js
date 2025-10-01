@@ -3,8 +3,8 @@ import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import SignatureCanvas from 'react-signature-canvas';
-import { PDFDocument } from 'pdf-lib';
-import { PenTool, Save, RotateCcw, Check, X, Send, Eye, Copy } from 'lucide-react';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { PenTool, Save, RotateCcw, Check, X, Send, Eye, Copy, MousePointer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,8 +12,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [signatureData, setSignatureData] = useState(null);
   const [isSigning, setIsSigning] = useState(false);
   const [signingLinkGenerated, setSigningLinkGenerated] = useState(null);
+  const [pdfDoc, setPdfDoc] = useState(null);
+  const [signaturePosition, setSignaturePosition] = useState(null);
+  const [showPositionSelector, setShowPositionSelector] = useState(false);
   
   const signaturePadRef = useRef(null);
+  const pdfViewerRef = useRef(null);
 
   const clearSignature = () => {
     if (signaturePadRef.current) {
@@ -34,7 +38,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
 
   const createSigningSession = async () => {
     try {
-      // Create a unique signing session
       const sessionId = uuidv4();
       const signingData = {
         sessionId,
@@ -45,17 +48,14 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         clientName,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       };
 
-      // Save to Firestore
       await setDoc(doc(db, 'signingSessions', sessionId), signingData);
       
-      // Generate the signing link
       const signingLink = `${window.location.origin}/sign/${sessionId}`;
       setSigningLinkGenerated(signingLink);
       
-      // Copy to clipboard
       navigator.clipboard.writeText(signingLink);
       toast.success('Signing link copied to clipboard!');
       
@@ -66,23 +66,77 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
   };
 
+  const handlePdfClick = (e) => {
+    if (!showPositionSelector) return;
+    
+    const rect = e.target.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Convert screen coordinates to PDF coordinates
+    const pdfX = (x / rect.width) * 612; // Standard page width
+    const pdfY = 792 - (y / rect.height) * 792; // Standard page height, inverted Y
+    
+    setSignaturePosition({ x: pdfX, y: pdfY });
+    toast.success('Signature position selected!');
+    setShowPositionSelector(false);
+  };
+
   const embedSignatureAndSave = async () => {
     if (!signatureData) {
       toast.error('Please provide a signature first');
       return;
     }
 
+    if (!signaturePosition) {
+      toast.error('Please select where to place the signature on the document');
+      return;
+    }
+
     setIsSigning(true);
     
     try {
-      // Fetch the PDF
-      const response = await fetch(document.url);
-      if (!response.ok) throw new Error('Failed to fetch PDF');
+      // Create a CORS proxy URL for Firebase Storage
+      // This fixes the CORS issue
+      let pdfBytes;
       
-      const pdfBytes = await response.arrayBuffer();
+      try {
+        // Try direct fetch first
+        const response = await fetch(document.url, {
+          mode: 'cors',
+          credentials: 'omit'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Direct fetch failed');
+        }
+        
+        pdfBytes = await response.arrayBuffer();
+      } catch (fetchError) {
+        console.log('Direct fetch failed, trying alternative method...');
+        
+        // Alternative: Download via XMLHttpRequest
+        pdfBytes = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', document.url, true);
+          xhr.responseType = 'arraybuffer';
+          
+          xhr.onload = () => {
+            if (xhr.status === 200) {
+              resolve(xhr.response);
+            } else {
+              reject(new Error('XHR failed'));
+            }
+          };
+          
+          xhr.onerror = () => reject(new Error('XHR error'));
+          xhr.send();
+        });
+      }
+      
       const pdfDoc = await PDFDocument.load(pdfBytes);
       
-      // Get first page (you can modify this to handle multiple pages)
+      // Get first page
       const pages = pdfDoc.getPages();
       const firstPage = pages[0];
       const { width, height } = firstPage.getSize();
@@ -94,15 +148,15 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       // Embed signature
       const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
       
-      // Place signature at bottom of page (adjust position as needed)
-      const sigWidth = 200;
-      const sigHeight = 60;
-      const sigX = width - sigWidth - 50; // Right side
-      const sigY = 50; // Bottom
+      // Use selected position or default
+      const sigWidth = 150;
+      const sigHeight = 50;
+      const sigX = signaturePosition ? signaturePosition.x : width - sigWidth - 50;
+      const sigY = signaturePosition ? signaturePosition.y : 100;
       
       firstPage.drawImage(signatureImage, {
         x: sigX,
-        y: sigY,
+        y: sigY - sigHeight, // Adjust for image height
         width: sigWidth,
         height: sigHeight,
       });
@@ -110,26 +164,37 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       // Add text below signature
       firstPage.drawText(`${clientName}`, {
         x: sigX,
-        y: sigY - 15,
+        y: sigY - sigHeight - 15,
         size: 10,
+        color: rgb(0, 0, 0),
       });
       
       firstPage.drawText(`Signed: ${new Date().toLocaleDateString()}`, {
         x: sigX,
-        y: sigY - 25,
+        y: sigY - sigHeight - 30,
         size: 8,
+        color: rgb(0.3, 0.3, 0.3),
       });
       
       // Save the signed PDF
       const signedPdfBytes = await pdfDoc.save();
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
-      // Upload to Firebase
+      // Upload to Firebase with proper metadata
       const timestamp = Date.now();
-      const signedFileName = `${clientId}/${timestamp}-signed-${document.name}`;
+      const signedFileName = `${clientId}/signed/${timestamp}-${document.name}`;
       const storageRef = ref(storage, `client-documents/${signedFileName}`);
       
-      const snapshot = await uploadBytes(storageRef, signedBlob);
+      // Set proper metadata for CORS
+      const metadata = {
+        contentType: 'application/pdf',
+        cacheControl: 'public, max-age=31536000',
+        customMetadata: {
+          'Access-Control-Allow-Origin': '*'
+        }
+      };
+      
+      const snapshot = await uploadBytes(storageRef, signedBlob, metadata);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
       // Save metadata
@@ -145,7 +210,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         clientName,
         originalDocId: document.id,
         signedBy: clientName,
-        signedAt: new Date().toISOString()
+        signedAt: new Date().toISOString(),
+        signaturePosition: signaturePosition
       };
       
       // Update client documents
@@ -166,7 +232,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       setTimeout(() => onClose(), 2000);
     } catch (error) {
       console.error('Error signing document:', error);
-      toast.error('Failed to sign document. Please try again.');
+      console.error('Error details:', error.message);
+      toast.error(`Failed to sign document: ${error.message}`);
     } finally {
       setIsSigning(false);
     }
@@ -186,15 +253,73 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
           <h3>Document Signing Options</h3>
           
           <div className="signing-option">
-            <h4>Option 1: View Document First</h4>
-            <p>Open the document to see where to sign, then come back here to add your signature.</p>
-            <button 
-              className="btn-secondary"
-              onClick={() => window.open(document.url, '_blank')}
+            <h4>Option 1: View & Select Signature Position</h4>
+            <p>Open the document and click where you want to place the signature.</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                className="btn-secondary"
+                onClick={() => window.open(document.url, '_blank')}
+              >
+                <Eye size={18} />
+                View Document
+              </button>
+              <button 
+                className={`btn-secondary ${showPositionSelector ? 'active' : ''}`}
+                onClick={() => {
+                  setShowPositionSelector(!showPositionSelector);
+                  toast.info(showPositionSelector ? 'Position selector disabled' : 'Click on the PDF preview below to select signature position');
+                }}
+              >
+                <MousePointer size={18} />
+                {showPositionSelector ? 'Cancel Selection' : 'Select Position'}
+              </button>
+            </div>
+            
+            {signaturePosition && (
+              <div style={{ marginTop: '10px', padding: '10px', background: '#e8f5e9', borderRadius: '4px' }}>
+                ✓ Signature position selected (x: {Math.round(signaturePosition.x)}, y: {Math.round(signaturePosition.y)})
+              </div>
+            )}
+            
+            {/* PDF Preview for position selection */}
+            <div 
+              ref={pdfViewerRef}
+              style={{
+                marginTop: '15px',
+                border: '2px solid #ddd',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                cursor: showPositionSelector ? 'crosshair' : 'default',
+                position: 'relative'
+              }}
+              onClick={handlePdfClick}
             >
-              <Eye size={18} />
-              View Document in New Tab
-            </button>
+              <iframe
+                src={`${document.url}#toolbar=0&navpanes=0`}
+                width="100%"
+                height="400px"
+                style={{ border: 'none', pointerEvents: showPositionSelector ? 'none' : 'auto' }}
+                title="PDF Preview"
+              />
+              {showPositionSelector && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(33, 150, 243, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#1976d2'
+                }}>
+                  Click where you want to place the signature
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="signing-option">
@@ -253,7 +378,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
             <button 
               className="btn-primary"
               onClick={embedSignatureAndSave}
-              disabled={!signatureData || isSigning}
+              disabled={!signatureData || !signaturePosition || isSigning}
             >
               <Save size={18} />
               {isSigning ? 'Signing...' : 'Sign & Save Document'}

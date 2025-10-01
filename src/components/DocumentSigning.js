@@ -462,15 +462,28 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between',
-                marginBottom: '15px',
+                marginBottom: '10px',
                 padding: '10px',
-                background: '#f8f9fa',
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
                 borderRadius: '4px'
               }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '5px' }}>
+                    📄 Working with Page {currentPage} of {totalPages}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#856404' }}>
+                    Signature boxes will be placed on page {currentPage}. The viewer shows page 1, but your signature will be embedded on the correct page.
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                   style={{
+                    flex: 1,
                     padding: '8px 15px',
                     background: currentPage === 1 ? '#ccc' : '#007bff',
                     color: 'white',
@@ -480,15 +493,13 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     fontWeight: '500'
                   }}
                 >
-                  Previous
+                  ← Page {currentPage - 1}
                 </button>
-                <span style={{ fontWeight: '500', fontSize: '14px' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
                 <button
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                   style={{
+                    flex: 1,
                     padding: '8px 15px',
                     background: currentPage === totalPages ? '#ccc' : '#007bff',
                     color: 'white',
@@ -498,7 +509,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                     fontWeight: '500'
                   }}
                 >
-                  Next
+                  Page {currentPage + 1} →
                 </button>
               </div>
 
@@ -654,8 +665,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               }}
             >
               <iframe
-                key={currentPage}
-                src={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(document.url)}&page=${currentPage}`}
+                key={`pdf-page-${currentPage}`}
+                src={document.url}
                 style={{
                   width: '100%',
                   height: '500px',
@@ -663,7 +674,20 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   pointerEvents: 'none'
                 }}
                 title="PDF Preview"
+                onLoad={() => {
+                  // Try to navigate to page after load
+                  console.log('PDF loaded, current page:', currentPage);
+                }}
               />
+              <div style={{
+                textAlign: 'center',
+                fontSize: '12px',
+                marginTop: '5px',
+                color: '#666',
+                fontStyle: 'italic'
+              }}>
+                Note: PDF viewer may not change pages. Use "Open Full Document" below to view all pages.
+              </div>
               
               {/* Your signature box (blue) - only show on current page */}
               {signatureBox && signatureBox.page === currentPage && (

@@ -12,6 +12,7 @@ import DocumentGenerationPanel from '../components/DocumentGenerationPanel';
 import ProbateDataForm from '../components/ProbateDataForm';
 import GuardianshipDataForm from '../components/GuardianshipDataForm';
 import ConservatorshipDataForm from '../components/ConservatorshipDataForm';
+import SignedDocuments from '../components/SignedDocuments';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -600,6 +601,11 @@ const ClientDetail = () => {
           {activeTab === 'documents' && (
             <div className="section-content">
               <DocumentUpload clientId={id} clientName={client.name} />
+              
+              {/* NEW: Signed Documents Section */}
+              <div style={{ marginTop: '40px' }}>
+                <SignedDocuments documents={client.documents || []} />
+              </div>
             </div>
           )}
 

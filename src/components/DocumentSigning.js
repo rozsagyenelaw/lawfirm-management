@@ -6,7 +6,6 @@ import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { PenTool, Save, RotateCcw, Check, X, Move, Download, Send, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
-import '../styles/DocumentSigning.css';
 
 const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) => {
   const [pdfDoc, setPdfDoc] = useState(null);

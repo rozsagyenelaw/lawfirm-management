@@ -13,10 +13,10 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [isSigning, setIsSigning] = useState(false);
   const [signingLinkGenerated, setSigningLinkGenerated] = useState(null);
   const [signaturePosition, setSignaturePosition] = useState(null);
-  const [clickMode, setClickMode] = useState(false);
+  const [selectedPage, setSelectedPage] = useState(1);
+  const [manualCoords, setManualCoords] = useState({ x: '', y: '' });
   
   const signaturePadRef = useRef(null);
-  const pdfContainerRef = useRef(null);
 
   const clearSignature = () => {
     if (signaturePadRef.current) {
@@ -65,26 +65,17 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
   };
 
-  const handleContainerClick = (e) => {
-    if (!clickMode) return;
+  const handleManualCoords = () => {
+    const x = parseInt(manualCoords.x);
+    const y = parseInt(manualCoords.y);
     
-    const container = pdfContainerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (isNaN(x) || isNaN(y)) {
+      toast.error('Please enter valid numbers for X and Y coordinates');
+      return;
+    }
     
-    // Convert to percentage of container size, then to PDF coordinates (standard letter: 612x792)
-    const percentX = x / rect.width;
-    const percentY = y / rect.height;
-    
-    const pdfX = percentX * 612;
-    const pdfY = (1 - percentY) * 792; // Invert Y because PDF coordinates start at bottom
-    
-    setSignaturePosition({ x: Math.round(pdfX), y: Math.round(pdfY) });
-    setClickMode(false);
-    toast.success('Signature position selected!');
+    setSignaturePosition({ x, y, page: selectedPage });
+    toast.success(`Position set to X=${x}, Y=${y} on page ${selectedPage}`);
   };
 
   const embedSignatureAndSave = async () => {
@@ -94,7 +85,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
 
     if (!signaturePosition) {
-      toast.error('Please click on the preview to select where to place the signature');
+      toast.error('Please enter coordinates to place the signature');
       return;
     }
 
@@ -102,17 +93,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     
     try {
       console.log('Starting signature process...');
-      console.log('Document path:', document.path);
+      console.log('Selected page:', signaturePosition.page);
+      console.log('Coordinates:', signaturePosition.x, signaturePosition.y);
       
-      // NEW METHOD: Use Firebase getBlob to bypass CORS
+      // Extract path from URL
       let pdfBytes;
-      
-      // Extract path from URL since that's the most reliable
-      console.log('Extracting path from URL...');
       const url = document.url;
-      
-      // Extract path from Firebase Storage URL
-      // Format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media
       const pathMatch = url.match(/\/o\/(.+?)\?/);
       
       if (pathMatch) {
@@ -124,24 +110,24 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         const blob = await getBlob(storageRef);
         pdfBytes = await blob.arrayBuffer();
         console.log('PDF fetched successfully');
-      } else if (document.path) {
-        // Fallback: use document.path if URL extraction fails
-        console.log('Using document.path:', document.path);
-        const storageRef = ref(storage, document.path);
-        const blob = await getBlob(storageRef);
-        pdfBytes = await blob.arrayBuffer();
-        console.log('PDF fetched via path property');
       } else {
-        throw new Error('Could not determine storage path');
+        throw new Error('Could not extract storage path from URL');
       }
       
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pages = pdfDoc.getPages();
-      const firstPage = pages[0];
-      const { width, height } = firstPage.getSize();
       
-      console.log('PDF loaded. Page size:', width, 'x', height);
-      console.log('Signature position:', signaturePosition);
+      // Get the selected page (convert to 0-indexed)
+      const pageIndex = (signaturePosition.page || 1) - 1;
+      
+      if (pageIndex < 0 || pageIndex >= pages.length) {
+        throw new Error(`Invalid page number. Document has ${pages.length} pages.`);
+      }
+      
+      const targetPage = pages[pageIndex];
+      const { width, height } = targetPage.getSize();
+      
+      console.log(`Page ${signaturePosition.page} size:`, width, 'x', height);
       
       // Convert signature to bytes
       const signatureImageBytes = signatureData.split(',')[1];
@@ -154,11 +140,13 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       const sigWidth = 150;
       const sigHeight = 50;
       
-      // Use selected position
+      // Use exact coordinates provided by user
       const sigX = signaturePosition.x;
-      const sigY = signaturePosition.y - sigHeight; // Adjust for image height
+      const sigY = signaturePosition.y;
       
-      firstPage.drawImage(signatureImage, {
+      console.log('Placing signature at:', sigX, sigY);
+      
+      targetPage.drawImage(signatureImage, {
         x: sigX,
         y: sigY,
         width: sigWidth,
@@ -166,21 +154,21 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       });
       
       // Add text below signature
-      firstPage.drawText(`${clientName}`, {
+      targetPage.drawText(`${clientName}`, {
         x: sigX,
         y: sigY - 15,
         size: 10,
         color: rgb(0, 0, 0),
       });
       
-      firstPage.drawText(`Signed: ${new Date().toLocaleDateString()}`, {
+      targetPage.drawText(`Signed: ${new Date().toLocaleDateString()}`, {
         x: sigX,
         y: sigY - 30,
         size: 8,
         color: rgb(0.3, 0.3, 0.3),
       });
       
-      console.log('Signature embedded at:', sigX, sigY);
+      console.log('Signature embedded');
       
       // Save the signed PDF
       const signedPdfBytes = await pdfDoc.save();
@@ -234,7 +222,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     } catch (error) {
       console.error('Error signing document:', error);
       console.error('Error details:', error.message);
-      console.error('Error stack:', error.stack);
       toast.error(`Failed to sign document: ${error.message}`);
     } finally {
       setIsSigning(false);
@@ -242,7 +229,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   };
 
   return (
-    <div className="document-signing-modal" style={{ 
+    <div style={{ 
       position: 'fixed', 
       top: 0, 
       left: 0, 
@@ -253,7 +240,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       alignItems: 'center', 
       justifyContent: 'center',
       zIndex: 1000,
-      padding: '20px'
+      padding: '20px',
+      overflow: 'auto'
     }}>
       <div style={{
         background: 'white',
@@ -277,89 +265,129 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Left side - PDF Preview */}
+          {/* Left side - PDF Preview & Position Selection */}
           <div>
-            <h3>Document Preview</h3>
-            <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-              {clickMode ? 
-                '👆 Click anywhere on the document below to place your signature' : 
-                'Click "Select Position" button to choose where to sign'}
-            </p>
+            <h3>Document Preview & Signature Position</h3>
             
-            <button 
-              onClick={() => setClickMode(!clickMode)}
-              style={{
-                padding: '10px 15px',
-                background: clickMode ? '#dc3545' : '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                marginBottom: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <MapPin size={18} />
-              {clickMode ? 'Cancel Selection' : 'Select Position'}
-            </button>
-
-            {signaturePosition && (
-              <div style={{
-                padding: '10px',
-                background: '#d4edda',
-                border: '1px solid #c3e6cb',
-                borderRadius: '4px',
-                marginBottom: '10px',
-                fontSize: '14px'
-              }}>
-                ✓ Position selected: X={signaturePosition.x}, Y={signaturePosition.y}
+            <div style={{ marginBottom: '15px', padding: '15px', background: '#f8f9fa', borderRadius: '4px' }}>
+              <h4 style={{ marginTop: 0 }}>Set Signature Position</h4>
+              <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+                PDF coordinates: X goes from left (0) to right (612 for standard page). Y goes from bottom (0) to top (792 for standard page).
+              </p>
+              
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                  Page Number:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={selectedPage}
+                  onChange={(e) => setSelectedPage(parseInt(e.target.value) || 1)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd'
+                  }}
+                />
               </div>
-            )}
-            
-            <div 
-              ref={pdfContainerRef}
-              onClick={handleContainerClick}
-              style={{
-                border: clickMode ? '3px solid #007bff' : '2px solid #ddd',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                cursor: clickMode ? 'crosshair' : 'default',
-                position: 'relative',
-                height: '500px',
-                background: '#f5f5f5'
-              }}
-            >
-              <iframe
-                src={`${document.url}#toolbar=0`}
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                    X Coordinate:
+                  </label>
+                  <input
+                    type="number"
+                    value={manualCoords.x}
+                    onChange={(e) => setManualCoords({ ...manualCoords, x: e.target.value })}
+                    placeholder="e.g. 400"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                    Y Coordinate:
+                  </label>
+                  <input
+                    type="number"
+                    value={manualCoords.y}
+                    onChange={(e) => setManualCoords({ ...manualCoords, y: e.target.value })}
+                    placeholder="e.g. 100"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <button
+                onClick={handleManualCoords}
                 style={{
                   width: '100%',
-                  height: '100%',
+                  padding: '10px',
+                  background: '#007bff',
+                  color: 'white',
                   border: 'none',
-                  pointerEvents: clickMode ? 'none' : 'auto'
-                }}
-                title="PDF Preview"
-              />
-              {clickMode && (
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: 'rgba(0, 123, 255, 0.1)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  color: '#007bff',
-                  pointerEvents: 'none'
+                  gap: '8px'
+                }}
+              >
+                <MapPin size={18} />
+                Set Position
+              </button>
+              
+              {signaturePosition && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '10px',
+                  background: '#d4edda',
+                  border: '1px solid #c3e6cb',
+                  borderRadius: '4px',
+                  fontSize: '14px'
                 }}>
-                  Click to Place Signature
+                  ✓ Position set: Page {signaturePosition.page}, X={signaturePosition.x}, Y={signaturePosition.y}
                 </div>
               )}
+              
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+                <strong>Common positions:</strong><br />
+                • Bottom right: X=400, Y=50<br />
+                • Bottom left: X=50, Y=50<br />
+                • Top right: X=400, Y=700<br />
+                • Center: X=230, Y=370
+              </div>
+            </div>
+            
+            <div style={{
+              border: '2px solid #ddd',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              height: '400px',
+              background: '#f5f5f5'
+            }}>
+              <iframe
+                src={`${document.url}#toolbar=0&page=${selectedPage}`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none'
+                }}
+                title="PDF Preview"
+              />
             </div>
 
             <button 

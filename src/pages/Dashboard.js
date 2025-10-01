@@ -5,6 +5,8 @@ import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import CourtReminders from '../components/CourtReminders';
+import PendingSignatures from '../components/PendingSignatures';
+import RecentSignedDocuments from '../components/RecentSignedDocuments';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -80,6 +82,19 @@ const Dashboard = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* NEW: Document Signature Tracking */}
+      <div className="dashboard-grid" style={{ marginTop: '30px' }}>
+        <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
+          <PendingSignatures />
+        </div>
+      </div>
+
+      <div className="dashboard-grid" style={{ marginTop: '20px' }}>
+        <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
+          <RecentSignedDocuments />
+        </div>
       </div>
 
       <div className="dashboard-grid">

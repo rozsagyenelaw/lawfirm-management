@@ -107,13 +107,18 @@ const ClientSigningPage = () => {
           const { width: pdfWidth, height: pdfHeight } = page.getSize();
           
           const x = marker.x;
-          const y = marker.y;
+          // Adjust Y to move signature higher - add about 75% of box height
+          const adjustmentFactor = 0.75; // This moves it up by 75% of the box height
+          const y = marker.y + (marker.height * adjustmentFactor);
           const markerWidth = marker.width;
           const markerHeight = marker.height;
           
           console.log('===== CLIENT SIGNING DEBUG =====');
           console.log('PDF Page Size:', pdfWidth, 'x', pdfHeight);
           console.log('Marker from database:', marker);
+          console.log('Original Y:', marker.y);
+          console.log('Adjustment:', marker.height * adjustmentFactor);
+          console.log('Adjusted Y:', y);
           console.log('Placing signature at:', { x, y, width: markerWidth, height: markerHeight });
           console.log('================================');
           

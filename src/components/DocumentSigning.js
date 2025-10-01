@@ -1,71 +1,97 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import SignatureCanvas from 'react-signature-canvas';
-import { PDFDocument, rgb } from 'pdf-lib';
-import { PenTool, Save, RotateCcw, Check, X, Move, Download, Send, Eye } from 'lucide-react';
+import { PDFDocument } from 'pdf-lib';
+import { Document, Page, pdfjs } from 'react-pdf';
+import { PenTool, Save, RotateCcw, Check, X, Move, Download, Eye, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+// Set up PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) => {
-  const [pdfDoc, setPdfDoc] = useState(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [numPages, setNumPages] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [signatureFields, setSignatureFields] = useState([]);
   const [activeSignature, setActiveSignature] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedField, setDraggedField] = useState(null);
   const [isSigning, setIsSigning] = useState(false);
-  const [signedUrl, setSignedUrl] = useState(null);
   const [viewMode, setViewMode] = useState('setup'); // 'setup', 'sign', 'preview'
-  const [isLoading, setIsLoading] = useState(true);
+  const [pageScale, setPageScale] = useState(1);
+  const [pdfBytes, setPdfBytes] = useState(null);
   
   const signaturePadRef = useRef(null);
+  const pageRef = useRef(null);
 
   useEffect(() => {
-    loadPdfDocument();
+    // Load PDF bytes for signing
+    loadPdfBytes();
   }, [document]);
 
-  const loadPdfDocument = async () => {
-    setIsLoading(true);
+  const loadPdfBytes = async () => {
     try {
-      // Fetch the PDF
       const response = await fetch(document.url);
-      if (!response.ok) {
-        throw new Error('Failed to fetch PDF');
-      }
-      
       const arrayBuffer = await response.arrayBuffer();
-      
-      // Load PDF for manipulation
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      setPdfDoc(pdfDoc);
-      
-      // Get page count for navigation
-      const pageCount = pdfDoc.getPageCount();
-      setTotalPages(pageCount);
-      
-      setIsLoading(false);
-      toast.success('Document loaded successfully');
+      setPdfBytes(arrayBuffer);
     } catch (error) {
       console.error('Error loading PDF:', error);
-      toast.error('Failed to load document. Please try again.');
-      setIsLoading(false);
+      toast.error('Failed to load document');
     }
+  };
+
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    toast.success('Document loaded successfully');
   };
 
   const addSignatureField = () => {
     const newField = {
       id: Date.now().toString(),
       page: currentPage,
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 60,
       signed: false,
       signatureData: null
     };
     setSignatureFields([...signatureFields, newField]);
-    toast.success(`Signature field added to page ${currentPage + 1}`);
+    setDraggedField(newField.id);
+  };
+
+  const handleMouseDown = (e, fieldId) => {
+    if (viewMode !== 'setup') return;
+    setIsDragging(true);
+    setDraggedField(fieldId);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || !draggedField || !pageRef.current) return;
+    
+    const rect = pageRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setSignatureFields(fields =>
+      fields.map(field =>
+        field.id === draggedField 
+          ? { ...field, x: x / pageScale, y: y / pageScale }
+          : field
+      )
+    );
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   const deleteSignatureField = (fieldId) => {
     setSignatureFields(fields => fields.filter(f => f.id !== fieldId));
-    setActiveSignature(null);
     toast.success('Signature field removed');
   };
 
@@ -94,7 +120,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   };
 
   const embedSignaturesAndSave = async () => {
-    if (!pdfDoc || signatureFields.length === 0) {
+    if (!pdfBytes || signatureFields.length === 0) {
       toast.error('Please add at least one signature');
       return;
     }
@@ -108,56 +134,34 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     setIsSigning(true);
     
     try {
-      // Create a copy of the PDF
-      const pdfBytes = await pdfDoc.save();
-      const copiedPdfDoc = await PDFDocument.load(pdfBytes);
+      // Load the PDF
+      const pdfDoc = await PDFDocument.load(pdfBytes);
       
-      // Embed signatures
+      // Embed signatures at exact positions
       for (const field of signatureFields) {
         if (field.signatureData) {
-          const page = copiedPdfDoc.getPages()[field.page];
-          const { width, height } = page.getSize();
+          const page = pdfDoc.getPages()[field.page - 1];
+          const { height } = page.getSize();
           
           // Convert base64 to bytes
           const signatureImageBytes = field.signatureData.split(',')[1];
           const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
           
-          // Embed the image
-          const signatureImage = await copiedPdfDoc.embedPng(signatureImageBuffer);
+          // Embed the signature image
+          const signatureImage = await pdfDoc.embedPng(signatureImageBuffer);
           
-          // Calculate position (centered on page with some margin)
-          const sigWidth = 200;
-          const sigHeight = 80;
-          const sigX = (width - sigWidth) / 2;
-          const sigY = height - 200 - (field.page * 100); // Adjust position based on page
-          
-          // Draw signature on page
+          // Draw signature at exact position (PDF coordinates are bottom-up)
           page.drawImage(signatureImage, {
-            x: sigX,
-            y: sigY,
-            width: sigWidth,
-            height: sigHeight,
-          });
-          
-          // Add timestamp and signer info
-          page.drawText(`Signed by: ${clientName}`, {
-            x: sigX,
-            y: sigY - 15,
-            size: 8,
-            color: rgb(0.5, 0.5, 0.5)
-          });
-          
-          page.drawText(`Date: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, {
-            x: sigX,
-            y: sigY - 25,
-            size: 8,
-            color: rgb(0.5, 0.5, 0.5)
+            x: field.x,
+            y: height - field.y - field.height, // Convert from top-down to bottom-up
+            width: field.width,
+            height: field.height,
           });
         }
       }
       
       // Save the signed PDF
-      const signedPdfBytes = await copiedPdfDoc.save();
+      const signedPdfBytes = await pdfDoc.save();
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
       // Upload to Firebase Storage
@@ -180,10 +184,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         clientId: clientId,
         clientName: clientName,
         originalDocId: document.id,
-        signatures: signatureFields.map(f => ({
-          page: f.page,
-          signedAt: new Date().toISOString()
-        })),
         signedBy: clientName,
         signedAt: new Date().toISOString()
       };
@@ -194,13 +194,13 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         documents: arrayUnion(signedDocData)
       });
       
-      setSignedUrl(downloadURL);
-      setViewMode('preview');
       toast.success('Document signed and saved successfully!');
       
       if (onSigned) {
         onSigned(signedDocData);
       }
+      
+      onClose();
     } catch (error) {
       console.error('Error signing document:', error);
       toast.error('Failed to sign document: ' + error.message);
@@ -209,38 +209,20 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="document-signing-modal">
-        <div className="signing-header">
-          <h2>Loading Document...</h2>
-          <button className="btn-text" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
-        <div className="signing-content">
-          <div className="loading-spinner">Loading PDF...</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="document-signing-modal">
+    <div className="document-signing-modal" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
       <div className="signing-header">
         <h2>Sign Document: {document.name}</h2>
         <div className="header-actions">
           {viewMode === 'setup' && (
-            <>
-              <button 
-                className="btn-primary"
-                onClick={() => setViewMode('sign')}
-                disabled={signatureFields.length === 0}
-              >
-                <PenTool size={18} />
-                Start Signing ({signatureFields.length} field{signatureFields.length !== 1 ? 's' : ''})
-              </button>
-            </>
+            <button 
+              className="btn-primary"
+              onClick={() => setViewMode('sign')}
+              disabled={signatureFields.length === 0}
+            >
+              <PenTool size={18} />
+              Start Signing ({signatureFields.filter(f => f.page === currentPage).length} on this page)
+            </button>
           )}
           {viewMode === 'sign' && (
             <button 
@@ -249,19 +231,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               disabled={isSigning || signatureFields.some(f => !f.signed)}
             >
               <Save size={18} />
-              {isSigning ? 'Processing...' : 'Save Signed Document'}
+              {isSigning ? 'Saving...' : 'Save Signed Document'}
             </button>
-          )}
-          {viewMode === 'preview' && signedUrl && (
-            <a 
-              href={signedUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="btn-primary"
-            >
-              <Download size={18} />
-              Download Signed
-            </a>
           )}
           <button className="btn-text" onClick={onClose}>
             <X size={20} />
@@ -270,134 +241,109 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       </div>
 
       <div className="signing-content">
-        <div className="pdf-viewer">
-          {viewMode !== 'preview' && (
-            <>
-              <div className="pdf-controls">
-                <button 
-                  disabled={currentPage === 0}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  className="btn-secondary"
-                >
-                  Previous
-                </button>
-                <span className="page-indicator">Page {currentPage + 1} of {totalPages}</span>
-                <button 
-                  disabled={currentPage === totalPages - 1}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  className="btn-secondary"
-                >
-                  Next
-                </button>
-              </div>
+        <div className="pdf-viewer-container">
+          <div className="pdf-controls">
+            <button 
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(currentPage - 1)}
+            >
+              Previous
+            </button>
+            <span>Page {currentPage} of {numPages || '...'}</span>
+            <button 
+              disabled={currentPage >= numPages}
+              onClick={() => setCurrentPage(currentPage + 1)}
+            >
+              Next
+            </button>
+            <button onClick={() => setPageScale(pageScale + 0.1)}>Zoom In</button>
+            <button onClick={() => setPageScale(Math.max(0.5, pageScale - 0.1))}>Zoom Out</button>
+          </div>
 
-              <div className="pdf-preview-area">
-                <div className="pdf-page-display">
-                  <h3>PDF Page {currentPage + 1}</h3>
-                  <p className="pdf-info">Document: {document.name}</p>
-                  
-                  <button 
-                    onClick={() => window.open(document.url, '_blank')} 
-                    className="btn-secondary view-pdf-btn"
+          <div className="pdf-page-wrapper">
+            <div className="pdf-page-container" ref={pageRef}>
+              <Document
+                file={document.url}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={<div>Loading PDF...</div>}
+                error={<div>Error loading PDF. <button onClick={() => window.open(document.url, '_blank')}>Open in new tab</button></div>}
+              >
+                <Page 
+                  pageNumber={currentPage}
+                  scale={pageScale}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                />
+              </Document>
+
+              {/* Signature fields overlay */}
+              {signatureFields
+                .filter(field => field.page === currentPage)
+                .map(field => (
+                  <div
+                    key={field.id}
+                    className={`signature-field-overlay ${field.signed ? 'signed' : ''} ${viewMode === 'sign' && !field.signed ? 'ready-to-sign' : ''}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${field.x * pageScale}px`,
+                      top: `${field.y * pageScale}px`,
+                      width: `${field.width * pageScale}px`,
+                      height: `${field.height * pageScale}px`,
+                      border: field.signed ? '2px solid #10b981' : '2px dashed #ef4444',
+                      backgroundColor: field.signed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      cursor: viewMode === 'setup' ? 'move' : 'pointer',
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, field.id)}
+                    onClick={() => viewMode === 'sign' && !field.signed && setActiveSignature(field.id)}
                   >
-                    <Eye size={18} />
-                    View Full PDF in New Tab
-                  </button>
-
-                  {viewMode === 'setup' && (
-                    <div className="signature-setup-info">
-                      <p>Click below to add signature fields to this page</p>
-                      <button 
-                        className="btn-primary add-signature-btn"
-                        onClick={addSignatureField}
-                      >
-                        <PenTool size={18} />
-                        Add Signature Field to Page {currentPage + 1}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Show signature fields for current page */}
-                  <div className="signature-fields-list">
-                    {signatureFields
-                      .filter(field => field.page === currentPage)
-                      .map(field => (
-                        <div key={field.id} className="signature-field-item">
-                          <span>
-                            Signature Field on Page {field.page + 1}
-                            {field.signed && ' ✓ Signed'}
-                          </span>
-                          {viewMode === 'setup' && (
+                    {field.signed && field.signatureData ? (
+                      <img 
+                        src={field.signatureData} 
+                        alt="Signature" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <div className="signature-field-content">
+                        {viewMode === 'setup' && (
+                          <>
+                            <span>Sign Here</span>
                             <button 
-                              onClick={() => deleteSignatureField(field.id)}
-                              className="btn-text"
+                              className="delete-field-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteSignatureField(field.id);
+                              }}
                             >
-                              <X size={16} />
+                              <X size={14} />
                             </button>
-                          )}
-                          {viewMode === 'sign' && !field.signed && (
-                            <button 
-                              onClick={() => setActiveSignature(field.id)}
-                              className="btn-primary"
-                            >
-                              Sign This Field
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                          </>
+                        )}
+                        {viewMode === 'sign' && !field.signed && (
+                          <span>Click to Sign</span>
+                        )}
+                      </div>
+                    )}
                   </div>
+                ))}
+            </div>
 
-                  {/* Summary of all signature fields */}
-                  {signatureFields.length > 0 && (
-                    <div className="signature-summary">
-                      <h4>Signature Fields Summary:</h4>
-                      <ul>
-                        {[...new Set(signatureFields.map(f => f.page))].sort().map(pageNum => {
-                          const pageFields = signatureFields.filter(f => f.page === pageNum);
-                          const signedCount = pageFields.filter(f => f.signed).length;
-                          return (
-                            <li key={pageNum}>
-                              Page {pageNum + 1}: {signedCount}/{pageFields.length} signed
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-
-          {viewMode === 'preview' && signedUrl && (
-            <div className="preview-success">
-              <Check size={48} color="#10b981" />
-              <h3>Document Signed Successfully!</h3>
-              <p>The signed document has been saved.</p>
-              <div className="preview-actions">
-                <a 
-                  href={signedUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="btn-primary"
-                >
-                  <Eye size={18} />
-                  View Signed Document
-                </a>
-                <button onClick={onClose} className="btn-secondary">
-                  Close
+            {viewMode === 'setup' && (
+              <div className="setup-instructions">
+                <p>Drag signature fields to position them exactly where signatures are needed</p>
+                <button className="btn-primary" onClick={addSignatureField}>
+                  <PenTool size={18} />
+                  Add Signature Field
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Signature Pad */}
         {viewMode === 'sign' && activeSignature && (
-          <div className="signature-pad-container">
-            <h3>Draw Your Signature</h3>
-            <p>Sign for field on page {signatureFields.find(f => f.id === activeSignature)?.page + 1}</p>
-            <div className="signature-pad-wrapper">
+          <div className="signature-pad-panel">
+            <h3>Sign Here</h3>
+            <div className="signature-canvas-wrapper">
               <SignatureCanvas
                 ref={signaturePadRef}
                 canvasProps={{
@@ -408,7 +354,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 backgroundColor="white"
               />
             </div>
-            <div className="signature-pad-actions">
+            <div className="signature-actions">
               <button className="btn-secondary" onClick={clearSignature}>
                 <RotateCcw size={18} />
                 Clear
@@ -418,7 +364,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 onClick={() => saveSignature(activeSignature)}
               >
                 <Check size={18} />
-                Apply Signature
+                Save Signature
               </button>
             </div>
           </div>

@@ -107,34 +107,32 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       // NEW METHOD: Use Firebase getBlob to bypass CORS
       let pdfBytes;
       
-      if (document.path) {
-        // If we have the storage path, use it directly
-        console.log('Fetching from Firebase Storage using path...');
+      // Extract path from URL since that's the most reliable
+      console.log('Extracting path from URL...');
+      const url = document.url;
+      
+      // Extract path from Firebase Storage URL
+      // Format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media
+      const pathMatch = url.match(/\/o\/(.+?)\?/);
+      
+      if (pathMatch) {
+        const encodedPath = pathMatch[1];
+        const decodedPath = decodeURIComponent(encodedPath);
+        console.log('Extracted path:', decodedPath);
+        
+        const storageRef = ref(storage, decodedPath);
+        const blob = await getBlob(storageRef);
+        pdfBytes = await blob.arrayBuffer();
+        console.log('PDF fetched successfully');
+      } else if (document.path) {
+        // Fallback: use document.path if URL extraction fails
+        console.log('Using document.path:', document.path);
         const storageRef = ref(storage, document.path);
         const blob = await getBlob(storageRef);
         pdfBytes = await blob.arrayBuffer();
-        console.log('PDF fetched via Firebase Storage API');
+        console.log('PDF fetched via path property');
       } else {
-        // Fallback: try to extract path from URL
-        console.log('Extracting path from URL...');
-        const url = document.url;
-        
-        // Extract path from Firebase Storage URL
-        // Format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media
-        const pathMatch = url.match(/\/o\/(.+?)\?/);
-        
-        if (pathMatch) {
-          const encodedPath = pathMatch[1];
-          const decodedPath = decodeURIComponent(encodedPath);
-          console.log('Extracted path:', decodedPath);
-          
-          const storageRef = ref(storage, decodedPath);
-          const blob = await getBlob(storageRef);
-          pdfBytes = await blob.arrayBuffer();
-          console.log('PDF fetched via extracted path');
-        } else {
-          throw new Error('Could not extract storage path from URL');
-        }
+        throw new Error('Could not determine storage path');
       }
       
       const pdfDoc = await PDFDocument.load(pdfBytes);

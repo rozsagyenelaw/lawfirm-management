@@ -21,6 +21,7 @@ import FinancialAnalytics from './pages/FinancialAnalytics';
 import AllDocuments from './pages/AllDocuments';
 import DocumentGeneration from './pages/DocumentGeneration';
 import FireLitigation from './pages/FireLitigation';
+import ClientSigningPage from './pages/ClientSigningPage';
 import './styles/App.css';
 
 function App() {
@@ -40,30 +41,40 @@ function App() {
               },
             }}
           />
-          <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-          <GlobalSearch />
-          <CourtReminders />
-          <main className={`main-content ${collapsed ? 'expanded' : ''}`}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/daily-digest" element={<DailyDigest />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/clients/:id" element={<ClientDetail />} />
-              <Route path="/tasks" element={<Tasks />} />
-              <Route path="/kanban" element={<Kanban />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/payments" element={<Payments />} />
-              <Route path="/analytics" element={<FinancialAnalytics />} />
-              <Route path="/court-calculator" element={<CourtCalculator />} />
-              <Route path="/activity-log" element={<ActivityLogPage />} />
-              <Route path="/all-documents" element={<AllDocuments />} />
-              <Route path="/document-generation" element={<DocumentGeneration />} />
-              <Route path="/fire-litigation" element={<FireLitigation />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </main>
+          <Routes>
+            {/* PUBLIC ROUTE - No Sidebar, No Authentication Required */}
+            <Route path="/sign/:sessionId" element={<ClientSigningPage />} />
+            
+            {/* ALL OTHER ROUTES - With Sidebar and App Layout */}
+            <Route path="*" element={
+              <>
+                <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+                <GlobalSearch />
+                <CourtReminders />
+                <main className={`main-content ${collapsed ? 'expanded' : ''}`}>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/daily-digest" element={<DailyDigest />} />
+                    <Route path="/clients" element={<Clients />} />
+                    <Route path="/clients/:id" element={<ClientDetail />} />
+                    <Route path="/tasks" element={<Tasks />} />
+                    <Route path="/kanban" element={<Kanban />} />
+                    <Route path="/calendar" element={<Calendar />} />
+                    <Route path="/invoices" element={<Invoices />} />
+                    <Route path="/payments" element={<Payments />} />
+                    <Route path="/analytics" element={<FinancialAnalytics />} />
+                    <Route path="/court-calculator" element={<CourtCalculator />} />
+                    <Route path="/activity-log" element={<ActivityLogPage />} />
+                    <Route path="/all-documents" element={<AllDocuments />} />
+                    <Route path="/document-generation" element={<DocumentGeneration />} />
+                    <Route path="/fire-litigation" element={<FireLitigation />} />
+                    <Route path="/settings" element={<Settings />} />
+                  </Routes>
+                </main>
+              </>
+            } />
+          </Routes>
         </div>
       </Router>
     </DataProvider>

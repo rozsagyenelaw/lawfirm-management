@@ -17,33 +17,59 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [isSigning, setIsSigning] = useState(false);
   const [signedUrl, setSignedUrl] = useState(null);
   const [viewMode, setViewMode] = useState('setup'); // 'setup', 'sign', 'preview'
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const signaturePadRef = useRef(null);
   const pdfCanvasRef = useRef(null);
 
   useEffect(() => {
     loadPdfDocument();
+    return () => {
+      // Cleanup blob URL when component unmounts
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+      }
+    };
   }, [document]);
 
   const loadPdfDocument = async () => {
+    setIsLoading(true);
     try {
+      // Fetch the PDF with proper CORS handling
       const response = await fetch(document.url);
-      const arrayBuffer = await response.arrayBuffer();
+      if (!response.ok) {
+        throw new Error('Failed to fetch PDF');
+      }
+      
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      
+      // Create a blob URL for the iframe
+      const blobUrl = URL.createObjectURL(blob);
+      setPdfBlobUrl(blobUrl);
+      
+      // Load PDF for manipulation
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       setPdfDoc(pdfDoc);
       
-      // Render PDF pages as images for preview
-      const pages = [];
+      // Get page count for navigation
       const pageCount = pdfDoc.getPageCount();
-      
+      const pages = [];
       for (let i = 0; i < pageCount; i++) {
-        // For now, we'll store page numbers - in production you'd render to canvas
-        pages.push({ pageNumber: i, width: 612, height: 792 }); // Standard letter size
+        const page = pdfDoc.getPage(i);
+        pages.push({ 
+          pageNumber: i, 
+          width: page.getWidth(), 
+          height: page.getHeight() 
+        });
       }
       setPdfPages(pages);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error loading PDF:', error);
-      toast.error('Failed to load document');
+      toast.error('Failed to load document. Please try downloading it instead.');
+      setIsLoading(false);
     }
   };
 
@@ -123,10 +149,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         if (field.signatureData) {
           const page = copiedPdfDoc.getPages()[field.page];
           
-          // Convert signature to image
-          const signatureImage = await copiedPdfDoc.embedPng(
-            field.signatureData.replace('data:image/png;base64,', '')
-          );
+          // Convert base64 to bytes
+          const signatureImageBytes = field.signatureData.split(',')[1];
+          const signatureImageBuffer = Uint8Array.from(atob(signatureImageBytes), c => c.charCodeAt(0));
+          
+          // Embed the image
+          const signatureImage = await copiedPdfDoc.embedPng(signatureImageBuffer);
           
           // Draw signature on page
           page.drawImage(signatureImage, {
@@ -202,7 +230,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       }
     } catch (error) {
       console.error('Error signing document:', error);
-      toast.error('Failed to sign document');
+      toast.error('Failed to sign document: ' + error.message);
     } finally {
       setIsSigning(false);
     }
@@ -219,6 +247,22 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     
     return signingLink;
   };
+
+  if (isLoading) {
+    return (
+      <div className="document-signing-modal">
+        <div className="signing-header">
+          <h2>Loading Document...</h2>
+          <button className="btn-text" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+        <div className="signing-content">
+          <div className="loading-spinner">Loading PDF...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="document-signing-modal">
@@ -287,12 +331,26 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
           </div>
 
           <div className="pdf-canvas-container" ref={pdfCanvasRef}>
-            {/* PDF Preview would go here - using iframe for simplicity */}
-            <iframe 
-              src={`${document.url}#page=${currentPage + 1}`}
-              className="pdf-iframe"
-              title="PDF Document"
-            />
+            {/* Use blob URL instead of direct Firebase URL to avoid CORS */}
+            {pdfBlobUrl && (
+              <iframe 
+                src={`${pdfBlobUrl}#page=${currentPage + 1}`}
+                className="pdf-iframe"
+                title="PDF Document"
+              />
+            )}
+            
+            {/* Alternative: Simple view message if iframe still doesn't work */}
+            {!pdfBlobUrl && (
+              <div className="pdf-placeholder">
+                <p>PDF Preview</p>
+                <p>Page {currentPage + 1} of {pdfPages.length}</p>
+                <button onClick={() => window.open(document.url, '_blank')} className="btn-secondary">
+                  <Eye size={18} />
+                  View Full PDF
+                </button>
+              </div>
+            )}
             
             {/* Signature Fields Overlay */}
             <div className="signature-fields-overlay">

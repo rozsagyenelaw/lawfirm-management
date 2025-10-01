@@ -83,12 +83,16 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
   };
 
-  const renderPage = async (pageNum) => {
+  const renderPage = async (pageNum, tempSignaturePos = null, tempMarkers = null) => {
     if (!pdfDoc || !canvasRef.current) return;
     
+    const sigPos = tempSignaturePos || signaturePosition;
+    const markersToRender = tempMarkers || markers;
+    
     console.log('renderPage called for page:', pageNum);
-    console.log('signaturePosition:', signaturePosition);
-    console.log('markers:', markers);
+    console.log('signaturePosition (from state):', signaturePosition);
+    console.log('sigPos (to render):', sigPos);
+    console.log('markers:', markersToRender);
     
     try {
       const page = await pdfDoc.getPage(pageNum);
@@ -109,9 +113,9 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       console.log('PDF rendered, now drawing markers');
       
       // Draw signature position marker (blue) if on current page
-      if (signaturePosition && signaturePosition.page === pageNum) {
-        const x = (signaturePosition.x / 612) * canvas.width;
-        const y = canvas.height - ((signaturePosition.y / 792) * canvas.height);
+      if (sigPos && sigPos.page === pageNum) {
+        const x = (sigPos.x / 612) * canvas.width;
+        const y = canvas.height - ((sigPos.y / 792) * canvas.height);
         
         console.log('Drawing blue signature box at:', x, y);
         
@@ -127,7 +131,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       }
       
       // Draw client markers (yellow) on current page
-      markers.filter(m => m.page === pageNum).forEach(marker => {
+      markersToRender.filter(m => m.page === pageNum).forEach(marker => {
         const x = (marker.x / 612) * canvas.width;
         const y = canvas.height - ((marker.y / 792) * canvas.height);
         
@@ -194,6 +198,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     }
     
     if (markMode) {
+      console.log('Mark mode: creating client marker');
       const newMarker = {
         x: Math.round(pdfX),
         y: Math.round(pdfY),
@@ -201,10 +206,12 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         id: Date.now(),
         type: 'client'
       };
-      setMarkers([...markers, newMarker]);
+      const updatedMarkers = [...markers, newMarker];
+      setMarkers(updatedMarkers);
       setMarkMode(false);
       toast.success('Client signature field marked - drag to adjust position');
-      triggerRender();
+      // Render immediately with new markers
+      renderPage(currentPage, signaturePosition, updatedMarkers);
     } else if (clickMode) {
       console.log('ClickMode active - setting signature position');
       const newPosition = {
@@ -216,8 +223,9 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       setSignaturePosition(newPosition);
       setClickMode(false);
       toast.success('Your signature position set - drag the blue box to adjust');
-      console.log('Calling triggerRender');
-      triggerRender();
+      console.log('Rendering immediately with new position');
+      // Render immediately with the new position, don't wait for state
+      renderPage(currentPage, newPosition, markers);
     }
   };
 

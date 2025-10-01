@@ -25,6 +25,19 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   
   const signaturePadRef = useRef(null);
   const canvasRef = useRef(null);
+  const renderTimeoutRef = useRef(null);
+
+  const triggerRender = () => {
+    // Debounce renders to prevent conflicts
+    if (renderTimeoutRef.current) {
+      clearTimeout(renderTimeoutRef.current);
+    }
+    renderTimeoutRef.current = setTimeout(() => {
+      if (pdfDoc && currentPage) {
+        renderPage(currentPage);
+      }
+    }, 50);
+  };
 
   useEffect(() => {
     loadPDF();
@@ -34,7 +47,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
     if (pdfDoc && currentPage) {
       renderPage(currentPage);
     }
-  }, [currentPage, pdfDoc, markers, signaturePosition]);
+  }, [currentPage, pdfDoc]); // Removed markers and signaturePosition to prevent re-render during drag
 
   const loadPDF = async () => {
     try {
@@ -173,8 +186,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       setMarkers([...markers, newMarker]);
       setMarkMode(false);
       toast.success('Client signature field marked - drag to adjust position');
-      // Force immediate re-render
-      setTimeout(() => renderPage(currentPage), 0);
+      triggerRender();
     } else if (clickMode) {
       setSignaturePosition({
         x: Math.round(pdfX),
@@ -183,8 +195,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       });
       setClickMode(false);
       toast.success('Your signature position set - drag the blue box to adjust');
-      // Force immediate re-render
-      setTimeout(() => renderPage(currentPage), 0);
+      triggerRender();
     }
   };
 
@@ -254,15 +265,14 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
         toast.success('Client marker position updated');
       }
       setDraggingMarker(null);
-      // Re-render after drag completes
-      setTimeout(() => renderPage(currentPage), 0);
+      triggerRender();
     }
   };
 
   const removeMarker = (markerId) => {
     setMarkers(markers.filter(m => m.id !== markerId));
-    renderPage(currentPage);
     toast.success('Marker removed');
+    triggerRender();
   };
 
   const clearSignature = () => {

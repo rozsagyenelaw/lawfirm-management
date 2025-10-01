@@ -84,19 +84,6 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* NEW: Document Signature Tracking */}
-      <div className="dashboard-grid" style={{ marginTop: '30px' }}>
-        <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
-          <PendingSignatures />
-        </div>
-      </div>
-
-      <div className="dashboard-grid" style={{ marginTop: '20px' }}>
-        <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
-          <RecentSignedDocuments />
-        </div>
-      </div>
-
       <div className="dashboard-grid">
         <div className="dashboard-card">
           <h2>Upcoming Tasks</h2>
@@ -228,6 +215,19 @@ const Dashboard = () => {
               Schedule Event
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Document Signature Tracking - Moved to Bottom */}
+      <div className="dashboard-grid" style={{ marginTop: '30px' }}>
+        <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
+          <PendingSignatures />
+        </div>
+      </div>
+
+      <div className="dashboard-grid" style={{ marginTop: '20px' }}>
+        <div className="dashboard-card" style={{ gridColumn: 'span 2' }}>
+          <RecentSignedDocuments />
         </div>
       </div>
     </div>

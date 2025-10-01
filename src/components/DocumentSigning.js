@@ -16,9 +16,32 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   const [clientBoxes, setClientBoxes] = useState([]); // Array of boxes for clients
   const [draggedBox, setDraggedBox] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   
   const signaturePadRef = useRef(null);
   const pdfContainerRef = useRef(null);
+
+  // Detect total pages from PDF URL
+  useEffect(() => {
+    const loadPdfInfo = async () => {
+      try {
+        const url = document.url;
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        const pages = pdfDoc.getPages();
+        setTotalPages(pages.length);
+      } catch (error) {
+        console.error('Error loading PDF info:', error);
+        setTotalPages(1);
+      }
+    };
+    
+    loadPdfInfo();
+  }, [document.url]);
 
   const clearSignature = () => {
     if (signaturePadRef.current) {
@@ -38,8 +61,6 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
   };
 
   const handlePdfClick = (e) => {
-    if (signatureBox) return; // Already placed
-    
     const container = pdfContainerRef.current;
     if (!container) return;
 
@@ -53,7 +74,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       y: y - 25, // Center the 50px box on click
       width: 150,
       height: 50,
-      page: 1 // For now, assuming single page or current page
+      page: currentPage // Assign to current page being viewed
     };
 
     setSignatureBox(box);
@@ -113,7 +134,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
       y: rect.height / 2 - 25,
       width: 150,
       height: 50,
-      page: 1
+      page: currentPage // Assign to current page
     };
 
     setClientBoxes([...clientBoxes, box]);
@@ -433,6 +454,51 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
             <h3>Document Preview</h3>
             
             <div style={{ marginBottom: '15px' }}>
+              {/* Page Navigation */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: '15px',
+                padding: '10px',
+                background: '#f8f9fa',
+                borderRadius: '4px'
+              }}>
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '8px 15px',
+                    background: currentPage === 1 ? '#ccc' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Previous
+                </button>
+                <span style={{ fontWeight: '500', fontSize: '14px' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '8px 15px',
+                    background: currentPage === totalPages ? '#ccc' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+
               <button 
                 onClick={handlePdfClick}
                 disabled={!!signatureBox}
@@ -453,7 +519,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 }}
               >
                 <MapPin size={18} />
-                {signatureBox ? '✓ Your Signature Placed' : 'Click PDF to Place Your Signature'}
+                {signatureBox ? `✓ Your Signature on Page ${signatureBox.page}` : 'Click PDF to Place Your Signature'}
               </button>
 
               <button 
@@ -474,7 +540,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 }}
               >
                 <Tag size={18} />
-                Add Client Signature Field
+                Add Client Signature Field (Page {currentPage})
               </button>
 
               {signatureBox && (
@@ -487,7 +553,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   fontSize: '13px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: '500' }}>✓ Your signature placed</span>
+                    <span style={{ fontWeight: '500' }}>✓ Your signature (Page {signatureBox.page})</span>
                     <button
                       onClick={() => {
                         setSignatureBox(null);
@@ -506,10 +572,16 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                       Remove
                     </button>
                   </div>
-                  <div style={{ fontSize: '12px', marginTop: '5px', color: '#155724' }}>
-                    <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
-                    Drag the blue box to adjust
-                  </div>
+                  {signatureBox.page === currentPage ? (
+                    <div style={{ fontSize: '12px', marginTop: '5px', color: '#155724' }}>
+                      <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
+                      Drag the blue box to adjust
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', marginTop: '5px', color: '#856404' }}>
+                      Go to page {signatureBox.page} to adjust position
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -525,36 +597,42 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                   <div style={{ fontWeight: '500', marginBottom: '5px' }}>
                     {clientBoxes.length} client field{clientBoxes.length > 1 ? 's' : ''}
                   </div>
-                  {clientBoxes.map(box => (
-                    <div key={box.id} style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginTop: '5px',
-                      padding: '5px',
-                      background: 'white',
-                      borderRadius: '3px'
-                    }}>
-                      <span style={{ fontSize: '12px' }}>
-                        <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
-                        Drag yellow box
-                      </span>
-                      <button
-                        onClick={() => removeClientBox(box.id)}
-                        style={{
-                          padding: '2px 6px',
-                          background: '#dc3545',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          fontSize: '10px'
-                        }}
-                      >
-                        Remove
-                      </button>
+                  {clientBoxes.filter(b => b.page === currentPage).length > 0 ? (
+                    clientBoxes.filter(b => b.page === currentPage).map(box => (
+                      <div key={box.id} style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '5px',
+                        padding: '5px',
+                        background: 'white',
+                        borderRadius: '3px'
+                      }}>
+                        <span style={{ fontSize: '12px' }}>
+                          <Move size={12} style={{ display: 'inline', marginRight: '5px' }} />
+                          Drag yellow box
+                        </span>
+                        <button
+                          onClick={() => removeClientBox(box.id)}
+                          style={{
+                            padding: '2px 6px',
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontSize: '10px'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#856404', marginTop: '5px' }}>
+                      No fields on this page. Navigate to other pages to see fields.
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
@@ -573,7 +651,7 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
               }}
             >
               <iframe
-                src={`${document.url}#toolbar=0`}
+                src={`${document.url}#page=${currentPage}&toolbar=0`}
                 style={{
                   width: '100%',
                   height: '500px',
@@ -583,8 +661,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 title="PDF Preview"
               />
               
-              {/* Your signature box (blue) */}
-              {signatureBox && (
+              {/* Your signature box (blue) - only show on current page */}
+              {signatureBox && signatureBox.page === currentPage && (
                 <div
                   onMouseDown={(e) => handleMouseDown(e, signatureBox, false)}
                   style={{
@@ -611,8 +689,8 @@ const DocumentSigning = ({ document, clientId, clientName, onClose, onSigned }) 
                 </div>
               )}
               
-              {/* Client boxes (yellow) */}
-              {clientBoxes.map(box => (
+              {/* Client boxes (yellow) - only show on current page */}
+              {clientBoxes.filter(box => box.page === currentPage).map(box => (
                 <div
                   key={box.id}
                   onMouseDown={(e) => handleMouseDown(e, box, true)}

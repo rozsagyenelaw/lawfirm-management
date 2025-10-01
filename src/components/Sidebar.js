@@ -1,7 +1,23 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ collapsed, setCollapsed }) => {
+  const navigate = useNavigate();
+  const { currentUser, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      try {
+        await signOut();
+        navigate('/login');
+      } catch (error) {
+        console.error('Logout error:', error);
+        alert('Failed to logout. Please try again.');
+      }
+    }
+  };
+
   const menuItems = [
     { path: '/dashboard', icon: '🏠', label: 'Dashboard' },
     { path: '/daily-digest', icon: '📊', label: 'Daily Digest' },
@@ -35,6 +51,16 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
         </button>
       </div>
       
+      {/* User Info */}
+      {!collapsed && currentUser && (
+        <div className="sidebar-user">
+          <div className="user-avatar">👤</div>
+          <div className="user-info">
+            <div className="user-email">{currentUser.email}</div>
+          </div>
+        </div>
+      )}
+      
       <nav className="sidebar-nav">
         {menuItems.map(item => (
           <NavLink
@@ -48,16 +74,20 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
           </NavLink>
         ))}
       </nav>
+
+      {/* Logout Button */}
+      <div className="sidebar-footer">
+        <button 
+          className="logout-btn"
+          onClick={handleLogout}
+          title={collapsed ? 'Logout' : ''}
+        >
+          <span style={{fontSize: '20px'}}>🚪</span>
+          {!collapsed && <span>Logout</span>}
+        </button>
+      </div>
     </aside>
   );
 };
 
 export default Sidebar;
-
-
-
-
-
-
-
-

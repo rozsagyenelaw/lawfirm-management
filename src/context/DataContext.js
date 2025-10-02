@@ -34,8 +34,11 @@ export const DataProvider = ({ children }) => {
   
   // Load initial data
   useEffect(() => {
-    if (!useFirebase) {
-      // Local storage mode
+    // Skip Firebase sync on signing pages
+    const isSigningPage = window.location.pathname.startsWith('/sign/');
+    
+    if (!useFirebase || isSigningPage) {
+      // Local storage mode or signing page
       const savedClients = localStorage.getItem('clients');
       const savedTasks = localStorage.getItem('tasks');
       const savedEvents = localStorage.getItem('events');
@@ -54,222 +57,247 @@ export const DataProvider = ({ children }) => {
       setTrustAccounts(savedTrustAccounts ? JSON.parse(savedTrustAccounts) : []);
       setFormFilings(savedFormFilings ? JSON.parse(savedFormFilings) : []);
       setSyncStatus('local');
-    } else {
-      // Firebase mode
-      setSyncStatus('syncing');
-      
-      // Load existing localStorage data first (for migration)
-      const localClients = JSON.parse(localStorage.getItem('clients') || '[]');
-      const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-      const localEvents = JSON.parse(localStorage.getItem('events') || '[]');
-      const localDocuments = JSON.parse(localStorage.getItem('documents') || '[]');
-      const localInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
-      const localPayments = JSON.parse(localStorage.getItem('payments') || '[]');
-      const localTrustAccounts = JSON.parse(localStorage.getItem('trustAccounts') || '[]');
-      const localFormFilings = JSON.parse(localStorage.getItem('formFilings') || '[]');
-      
-      // Set local data immediately
-      setClients(localClients);
-      setTasks(localTasks);
-      setEvents(localEvents);
-      setDocuments(localDocuments);
-      setInvoices(localInvoices);
-      setPayments(localPayments);
-      setTrustAccounts(localTrustAccounts);
-      setFormFilings(localFormFilings);
-      
-      // Real-time sync for clients
-      const unsubClients = onSnapshot(
-        collection(db, 'clients'),
-        (snapshot) => {
-          const clientsList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setClients(clientsList);
-          localStorage.setItem('clients', JSON.stringify(clientsList)); // Offline backup
-        },
-        (error) => {
-          console.error('Error syncing clients:', error);
-          // Keep using local data if Firebase fails
-        }
-      );
-      
-      // Real-time sync for tasks
-      const unsubTasks = onSnapshot(
-        collection(db, 'tasks'),
-        (snapshot) => {
-          const tasksList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setTasks(tasksList);
-          localStorage.setItem('tasks', JSON.stringify(tasksList));
-        }
-      );
-      
-      // Real-time sync for events
-      const unsubEvents = onSnapshot(
-        collection(db, 'events'),
-        (snapshot) => {
-          const eventsList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setEvents(eventsList);
-          localStorage.setItem('events', JSON.stringify(eventsList));
-        }
-      );
-      
-      // Real-time sync for documents
-      const unsubDocs = onSnapshot(
-        collection(db, 'documents'),
-        (snapshot) => {
-          const docsList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setDocuments(docsList);
-          localStorage.setItem('documents', JSON.stringify(docsList));
-        }
-      );
-      
-      // Real-time sync for invoices
-      const unsubInvoices = onSnapshot(
-        collection(db, 'invoices'),
-        (snapshot) => {
-          const invoicesList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setInvoices(invoicesList);
-          localStorage.setItem('invoices', JSON.stringify(invoicesList));
-        }
-      );
-      
-      // Real-time sync for payments
-      const unsubPayments = onSnapshot(
-        collection(db, 'payments'),
-        (snapshot) => {
-          const paymentsList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setPayments(paymentsList);
-          localStorage.setItem('payments', JSON.stringify(paymentsList));
-        }
-      );
-      
-      // Real-time sync for trust accounts
-      const unsubTrustAccounts = onSnapshot(
-        collection(db, 'trustAccounts'),
-        (snapshot) => {
-          const trustAccountsList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setTrustAccounts(trustAccountsList);
-          localStorage.setItem('trustAccounts', JSON.stringify(trustAccountsList));
-        }
-      );
-      
-      // Real-time sync for form filings
-      const unsubFormFilings = onSnapshot(
-        collection(db, 'formFilings'),
-        (snapshot) => {
-          const formFilingsList = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setFormFilings(formFilingsList);
-          localStorage.setItem('formFilings', JSON.stringify(formFilingsList));
-        }
-      );
-      
-      setSyncStatus('synced');
-      
-      // Migrate existing localStorage data to Firebase
-      if (localClients.length > 0) {
-        localClients.forEach(async (client) => {
-          try {
-            await setDoc(doc(db, 'clients', client.id), client);
-          } catch (error) {
-            console.error('Error migrating client:', error);
-          }
-        });
-      }
-      
-      if (localTasks.length > 0) {
-        localTasks.forEach(async (task) => {
-          try {
-            await setDoc(doc(db, 'tasks', task.id), task);
-          } catch (error) {
-            console.error('Error migrating task:', error);
-          }
-        });
-      }
-      
-      if (localEvents.length > 0) {
-        localEvents.forEach(async (event) => {
-          try {
-            await setDoc(doc(db, 'events', event.id), event);
-          } catch (error) {
-            console.error('Error migrating event:', error);
-          }
-        });
-      }
-      
-      if (localInvoices.length > 0) {
-        localInvoices.forEach(async (invoice) => {
-          try {
-            await setDoc(doc(db, 'invoices', invoice.id), invoice);
-          } catch (error) {
-            console.error('Error migrating invoice:', error);
-          }
-        });
-      }
-      
-      if (localPayments.length > 0) {
-        localPayments.forEach(async (payment) => {
-          try {
-            await setDoc(doc(db, 'payments', payment.id), payment);
-          } catch (error) {
-            console.error('Error migrating payment:', error);
-          }
-        });
-      }
-      
-      if (localTrustAccounts.length > 0) {
-        localTrustAccounts.forEach(async (account) => {
-          try {
-            await setDoc(doc(db, 'trustAccounts', account.id), account);
-          } catch (error) {
-            console.error('Error migrating trust account:', error);
-          }
-        });
-      }
-      
-      if (localFormFilings.length > 0) {
-        localFormFilings.forEach(async (filing) => {
-          try {
-            await setDoc(doc(db, 'formFilings', filing.id), filing);
-          } catch (error) {
-            console.error('Error migrating form filing:', error);
-          }
-        });
-      }
-      
-      return () => {
-        unsubClients();
-        unsubTasks();
-        unsubEvents();
-        unsubDocs();
-        unsubInvoices();
-        unsubPayments();
-        unsubTrustAccounts();
-        unsubFormFilings();
-      };
+      return;
     }
+    
+    // Firebase mode
+    setSyncStatus('syncing');
+    
+    // Load existing localStorage data first (for migration)
+    const localClients = JSON.parse(localStorage.getItem('clients') || '[]');
+    const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    const localEvents = JSON.parse(localStorage.getItem('events') || '[]');
+    const localDocuments = JSON.parse(localStorage.getItem('documents') || '[]');
+    const localInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+    const localPayments = JSON.parse(localStorage.getItem('payments') || '[]');
+    const localTrustAccounts = JSON.parse(localStorage.getItem('trustAccounts') || '[]');
+    const localFormFilings = JSON.parse(localStorage.getItem('formFilings') || '[]');
+    
+    // Set local data immediately
+    setClients(localClients);
+    setTasks(localTasks);
+    setEvents(localEvents);
+    setDocuments(localDocuments);
+    setInvoices(localInvoices);
+    setPayments(localPayments);
+    setTrustAccounts(localTrustAccounts);
+    setFormFilings(localFormFilings);
+    
+    // Real-time sync for clients
+    const unsubClients = onSnapshot(
+      collection(db, 'clients'),
+      (snapshot) => {
+        const clientsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setClients(clientsList);
+        localStorage.setItem('clients', JSON.stringify(clientsList)); // Offline backup
+      },
+      (error) => {
+        console.error('Error syncing clients:', error);
+        // Keep using local data if Firebase fails
+      }
+    );
+    
+    // Real-time sync for tasks
+    const unsubTasks = onSnapshot(
+      collection(db, 'tasks'),
+      (snapshot) => {
+        const tasksList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setTasks(tasksList);
+        localStorage.setItem('tasks', JSON.stringify(tasksList));
+      }
+    );
+    
+    // Real-time sync for events
+    const unsubEvents = onSnapshot(
+      collection(db, 'events'),
+      (snapshot) => {
+        const eventsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setEvents(eventsList);
+        localStorage.setItem('events', JSON.stringify(eventsList));
+      }
+    );
+    
+    // Real-time sync for documents
+    const unsubDocs = onSnapshot(
+      collection(db, 'documents'),
+      (snapshot) => {
+        const docsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setDocuments(docsList);
+        localStorage.setItem('documents', JSON.stringify(docsList));
+      }
+    );
+    
+    // Real-time sync for invoices
+    const unsubInvoices = onSnapshot(
+      collection(db, 'invoices'),
+      (snapshot) => {
+        const invoicesList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setInvoices(invoicesList);
+        localStorage.setItem('invoices', JSON.stringify(invoicesList));
+      }
+    );
+    
+    // Real-time sync for payments
+    const unsubPayments = onSnapshot(
+      collection(db, 'payments'),
+      (snapshot) => {
+        const paymentsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setPayments(paymentsList);
+        localStorage.setItem('payments', JSON.stringify(paymentsList));
+      }
+    );
+    
+    // Real-time sync for trust accounts
+    const unsubTrustAccounts = onSnapshot(
+      collection(db, 'trustAccounts'),
+      (snapshot) => {
+        const trustAccountsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setTrustAccounts(trustAccountsList);
+        localStorage.setItem('trustAccounts', JSON.stringify(trustAccountsList));
+      }
+    );
+    
+    // Real-time sync for form filings
+    const unsubFormFilings = onSnapshot(
+      collection(db, 'formFilings'),
+      (snapshot) => {
+        const formFilingsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setFormFilings(formFilingsList);
+        localStorage.setItem('formFilings', JSON.stringify(formFilingsList));
+      }
+    );
+    
+    setSyncStatus('synced');
+    
+    // Migrate existing localStorage data to Firebase - ONE TIME ONLY
+    const migrationDone = localStorage.getItem('firebase_migration_done');
+    
+    if (!migrationDone && localClients.length > 0) {
+      console.log('Starting one-time Firebase migration...');
+      
+      // Use async IIFE to handle migrations properly
+      (async () => {
+        try {
+          // Migrate clients
+          if (localClients.length > 0) {
+            for (const client of localClients) {
+              try {
+                await setDoc(doc(db, 'clients', client.id), client);
+              } catch (error) {
+                console.error('Error migrating client:', error);
+              }
+            }
+          }
+          
+          // Migrate tasks
+          if (localTasks.length > 0) {
+            for (const task of localTasks) {
+              try {
+                await setDoc(doc(db, 'tasks', task.id), task);
+              } catch (error) {
+                console.error('Error migrating task:', error);
+              }
+            }
+          }
+          
+          // Migrate events
+          if (localEvents.length > 0) {
+            for (const event of localEvents) {
+              try {
+                await setDoc(doc(db, 'events', event.id), event);
+              } catch (error) {
+                console.error('Error migrating event:', error);
+              }
+            }
+          }
+          
+          // Migrate invoices
+          if (localInvoices.length > 0) {
+            for (const invoice of localInvoices) {
+              try {
+                await setDoc(doc(db, 'invoices', invoice.id), invoice);
+              } catch (error) {
+                console.error('Error migrating invoice:', error);
+              }
+            }
+          }
+          
+          // Migrate payments
+          if (localPayments.length > 0) {
+            for (const payment of localPayments) {
+              try {
+                await setDoc(doc(db, 'payments', payment.id), payment);
+              } catch (error) {
+                console.error('Error migrating payment:', error);
+              }
+            }
+          }
+          
+          // Migrate trust accounts
+          if (localTrustAccounts.length > 0) {
+            for (const account of localTrustAccounts) {
+              try {
+                await setDoc(doc(db, 'trustAccounts', account.id), account);
+              } catch (error) {
+                console.error('Error migrating trust account:', error);
+              }
+            }
+          }
+          
+          // Migrate form filings
+          if (localFormFilings.length > 0) {
+            for (const filing of localFormFilings) {
+              try {
+                await setDoc(doc(db, 'formFilings', filing.id), filing);
+              } catch (error) {
+                console.error('Error migrating form filing:', error);
+              }
+            }
+          }
+          
+          // Mark migration as complete
+          localStorage.setItem('firebase_migration_done', 'true');
+          console.log('Firebase migration complete');
+        } catch (error) {
+          console.error('Migration error:', error);
+        }
+      })();
+    }
+    
+    return () => {
+      unsubClients();
+      unsubTasks();
+      unsubEvents();
+      unsubDocs();
+      unsubInvoices();
+      unsubPayments();
+      unsubTrustAccounts();
+      unsubFormFilings();
+    };
   }, [useFirebase]);
   
   // Save to localStorage when data changes (local mode)

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { FileCheck, Download, Calendar } from 'lucide-react';
+import { FileCheck, Download, Calendar, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const RecentSignedDocuments = () => {
   const [signedDocs, setSignedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     loadRecentSignedDocs();
@@ -33,6 +34,25 @@ const RecentSignedDocuments = () => {
       console.error('Error loading signed documents:', error);
       toast.error('Failed to load signed documents');
       setLoading(false);
+    }
+  };
+
+  const deleteSignedDocument = async (sessionId, documentName) => {
+    if (!window.confirm(`Are you sure you want to delete "${documentName}" from signed documents?`)) {
+      return;
+    }
+
+    setDeleting(sessionId);
+    try {
+      await deleteDoc(doc(db, 'signingSessions', sessionId));
+      toast.success('Signed document deleted successfully');
+      // Reload the list
+      loadRecentSignedDocs();
+    } catch (error) {
+      console.error('Error deleting signed document:', error);
+      toast.error('Failed to delete signed document');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -127,19 +147,41 @@ const RecentSignedDocuments = () => {
                 </div>
               </div>
               
-              {doc.signedDocumentUrl && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {doc.signedDocumentUrl && (
+                  <button
+                    onClick={() => {
+                      window.open(doc.signedDocumentUrl, '_blank');
+                      toast.success('Opening signed document...');
+                    }}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    <Download size={16} />
+                    Download
+                  </button>
+                )}
                 <button
-                  onClick={() => {
-                    window.open(doc.signedDocumentUrl, '_blank');
-                    toast.success('Opening signed document...');
-                  }}
+                  onClick={() => deleteSignedDocument(doc.id, doc.documentName)}
+                  disabled={deleting === doc.id}
                   style={{
                     padding: '10px 20px',
-                    background: '#28a745',
+                    background: deleting === doc.id ? '#ccc' : '#dc3545',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: deleting === doc.id ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
@@ -147,10 +189,10 @@ const RecentSignedDocuments = () => {
                     fontWeight: '500'
                   }}
                 >
-                  <Download size={16} />
-                  Download
+                  <Trash2 size={16} />
+                  {deleting === doc.id ? 'Deleting...' : 'Delete'}
                 </button>
-              )}
+              </div>
             </div>
           </div>
         ))}

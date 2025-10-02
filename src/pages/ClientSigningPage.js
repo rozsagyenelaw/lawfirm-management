@@ -177,10 +177,11 @@ const ClientSigningPage = () => {
       const signedPdfBytes = await pdfDoc.save();
       const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
       
-      // Upload to Firebase Storage
+      // Upload to Firebase Storage - FIXED PATH
       const timestamp = Date.now();
-      const signedFileName = `${session.clientId}/client-signed/${timestamp}-${session.documentName}`;
-      const storageRef = ref(storage, `client-documents/${signedFileName}`);
+      const signedFileName = `${timestamp}-${session.documentName}`;
+      // ✅ FIXED: Upload directly to client-signed/ folder (public write access)
+      const storageRef = ref(storage, `client-signed/${signedFileName}`);
       
       await uploadBytes(storageRef, signedBlob);
       const downloadURL = await getDownloadURL(storageRef);
@@ -197,7 +198,7 @@ const ClientSigningPage = () => {
         id: timestamp.toString(),
         name: `CLIENT-SIGNED-${session.documentName}`,
         url: downloadURL,
-        path: signedFileName,
+        path: `client-signed/${signedFileName}`,
         size: signedBlob.size,
         uploadedAt: new Date().toISOString(),
         type: 'pdf',

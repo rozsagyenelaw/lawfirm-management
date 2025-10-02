@@ -185,24 +185,22 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              {
-  role: 'system',
-  content: `You are an expert legal analyst with expertise across all practice areas including civil litigation, family law, criminal defense, immigration, personal injury, business law, and more. 
-           Analyze legal documents and extract key information relevant to the case type.
-           Always respond with valid JSON only.`
-}
-            },
-            {
-              role: 'user',
-              content: analysisPrompt
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 2000
-        })
+  model: 'gpt-4',
+  messages: [
+    {
+      role: 'system',
+      content: `You are an expert legal analyst with expertise across all practice areas including civil litigation, family law, criminal defense, immigration, personal injury, business law, and more. 
+               Analyze legal documents and extract key information relevant to the case type.
+               Always respond with valid JSON only.`
+    },
+    {
+      role: 'user',
+      content: analysisPrompt
+    }
+  ],
+  temperature: 0.3,
+  max_tokens: 2000
+})
       });
 
       const data = await response.json();

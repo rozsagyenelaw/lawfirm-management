@@ -188,10 +188,12 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           model: 'gpt-4',
           messages: [
             {
-              role: 'system',
-              content: `You are an expert legal analyst specializing in California fire litigation. 
-                       Analyze legal documents and extract key information relevant to fire victim cases.
-                       Always respond with valid JSON only.`
+              {
+  role: 'system',
+  content: `You are an expert legal analyst with expertise across all practice areas including civil litigation, family law, criminal defense, immigration, personal injury, business law, and more. 
+           Analyze legal documents and extract key information relevant to the case type.
+           Always respond with valid JSON only.`
+}
             },
             {
               role: 'user',

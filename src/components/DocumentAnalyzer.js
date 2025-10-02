@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { Upload, FileText, AlertTriangle, CheckCircle, DollarSign, X, Loader, AlertCircle, Gavel, Search, Scale, Mail, Users, Camera, File, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
   const [uploading, setUploading] = useState(false);
@@ -8,11 +13,10 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
   const [analysis, setAnalysis] = useState(null);
   const [fileName, setFileName] = useState('');
   const [documentText, setDocumentText] = useState('');
-  const [documentType, setDocumentType] = useState('auto'); // auto-detect by default
+  const [documentType, setDocumentType] = useState('auto');
   
-  // Your OpenAI API key from environment variable
   const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
-  console.log('API Key loaded:', OPENAI_API_KEY ? 'Yes' : 'No'); // ADD THIS LINE
+  console.log('API Key loaded:', OPENAI_API_KEY ? 'Yes' : 'No');
 
   const documentTypes = [
     { value: 'auto', label: 'Auto-Detect Type', icon: Search },
@@ -29,6 +33,39 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     { value: 'other', label: 'Other Legal Document', icon: File }
   ];
 
+  // Extract text from PDF using PDF.js
+  const extractTextFromPDF = async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+
+      return fullText;
+    } catch (error) {
+      console.error('Error extracting PDF text:', error);
+      throw new Error('Failed to extract text from PDF');
+    }
+  };
+
+  // Extract text from Word document using Mammoth
+  const extractTextFromWord = async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    } catch (error) {
+      console.error('Error extracting Word text:', error);
+      throw new Error('Failed to extract text from Word document');
+    }
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -37,73 +74,70 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     setUploading(true);
 
     try {
-      // For PDF files, we'll extract text
+      let extractedText = '';
+
+      // Handle PDF files
       if (file.type === 'application/pdf') {
-        // Note: You'll need to add pdf.js library for this
-        // For now, we'll use demo mode
-        toast('PDF processing requires additional setup. Using demo mode.');
+        toast('Extracting text from PDF...');
+        extractedText = await extractTextFromPDF(file);
         
-        // Demo text for testing
-        const demoInsuranceText = `
-          HOMEOWNER'S INSURANCE POLICY
-          Policy Number: HO-123456789
-          Insured: ${clientName}
-          
-          COVERAGE LIMITS:
-          Dwelling Coverage (Coverage A): $850,000
-          Other Structures (Coverage B): $85,000
-          Personal Property (Coverage C): $425,000
-          Loss of Use (Coverage D): $255,000
-          
-          DEDUCTIBLE: $5,000
-          
-          EXCLUSIONS:
-          - Earthquake damage
-          - Flood damage
-          - Earth movement
-          - Neglect
-          - Power failure
-          
-          WILDFIRE COVERAGE:
-          This policy covers direct physical loss caused by wildfire, subject to policy limits and deductibles.
-          
-          ADDITIONAL LIVING EXPENSES:
-          Covers necessary increase in living expenses incurred by the insured to maintain normal standard of living.
-          Limited to 30% of dwelling coverage or 24 months, whichever comes first.
-          
-          DEBRIS REMOVAL:
-          Coverage for debris removal is included up to 5% of the dwelling limit.
-        `;
-        
-        setDocumentText(demoInsuranceText);
-        
-        // Auto-detect document type from filename if set to auto
-        if (documentType === 'auto') {
-          const detectedType = detectDocumentType(file.name);
-          setDocumentType(detectedType);
+        if (!extractedText || extractedText.trim().length === 0) {
+          toast.error('Could not extract text from PDF. The file might be scanned or image-based.');
+          setUploading(false);
+          return;
         }
-        
-        analyzeDocument(demoInsuranceText, documentType);
-      } else {
-        // Handle text files
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const text = e.target.result;
-          setDocumentText(text);
-          
-          // Auto-detect document type from filename if set to auto
-          if (documentType === 'auto') {
-            const detectedType = detectDocumentType(file.name);
-            setDocumentType(detectedType);
-          }
-          
-          analyzeDocument(text, documentType);
-        };
-        reader.readAsText(file);
       }
+      // Handle Word documents (.docx)
+      else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+               file.name.endsWith('.docx')) {
+        toast('Extracting text from Word document...');
+        extractedText = await extractTextFromWord(file);
+        
+        if (!extractedText || extractedText.trim().length === 0) {
+          toast.error('Could not extract text from Word document.');
+          setUploading(false);
+          return;
+        }
+      }
+      // Handle text files
+      else if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+        const reader = new FileReader();
+        extractedText = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+      }
+      // Unsupported file type
+      else {
+        toast.error('Unsupported file type. Please upload PDF, Word (.docx), or text files.');
+        setUploading(false);
+        return;
+      }
+
+      // Check if we got any text
+      if (!extractedText || extractedText.trim().length === 0) {
+        toast.error('No text could be extracted from the document.');
+        setUploading(false);
+        return;
+      }
+
+      console.log('Extracted text length:', extractedText.length);
+      setDocumentText(extractedText);
+
+      // Auto-detect document type from filename if set to auto
+      if (documentType === 'auto') {
+        const detectedType = detectDocumentType(file.name);
+        setDocumentType(detectedType);
+        toast(`Detected document type: ${documentTypes.find(t => t.value === detectedType)?.label}`);
+      }
+
+      // Analyze the document
+      analyzeDocument(extractedText, documentType);
+
     } catch (error) {
-      console.error('Error uploading file:', error);
-      toast.error('Error uploading file');
+      console.error('Error processing file:', error);
+      toast.error(`Error processing file: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -127,10 +161,23 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
   const analyzeDocument = async (text, type) => {
     setAnalyzing(true);
     
-    // Customize the analysis based on document type
-    const analysisPrompt = getAnalysisPrompt(type, text);
+    // Check if text is too short
+    if (text.length < 100) {
+      toast.error('Document text is too short for meaningful analysis');
+      setAnalyzing(false);
+      return;
+    }
+
+    // Truncate text if it's too long for the API (keep first 10000 chars)
+    const truncatedText = text.length > 10000 ? text.substring(0, 10000) + '...' : text;
+    
+    const analysisPrompt = getAnalysisPrompt(type, truncatedText);
     
     try {
+      if (!OPENAI_API_KEY) {
+        throw new Error('OpenAI API key not configured');
+      }
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -143,7 +190,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
             {
               role: 'system',
               content: `You are an expert legal analyst specializing in California fire litigation. 
-                       Analyze legal documents and extract key information relevant to fire victim cases.`
+                       Analyze legal documents and extract key information relevant to fire victim cases.
+                       Always respond with valid JSON only.`
             },
             {
               role: 'user',
@@ -161,25 +209,19 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         throw new Error(data.error.message);
       }
 
-      // Get the AI response content
       let content = data.choices[0].message.content;
       console.log('Raw AI response:', content);
       
-      // Try to parse the JSON response
       let analysisResult;
       try {
-        // First try direct parsing
         analysisResult = JSON.parse(content);
       } catch (e) {
-        // If that fails, try to extract JSON from the response
-        // The AI might have added text before/after the JSON
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
             analysisResult = JSON.parse(jsonMatch[0]);
           } catch (e2) {
             console.error('Failed to parse extracted JSON:', e2);
-            // If still failing, create a basic structure
             analysisResult = {
               deadlines: [],
               actionItems: [],
@@ -188,7 +230,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
             };
           }
         } else {
-          // Fall back to basic structure
           analysisResult = {
             deadlines: [],
             actionItems: [],
@@ -198,92 +239,9 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         }
       }
       
-      // Now extract deadlines from the original document text if not found in AI response
+      // Extract deadlines from the original document text if not found
       if ((!analysisResult.deadlines || analysisResult.deadlines.length === 0) && text) {
-        const extractedDeadlines = [];
-        
-        // Look for dates in various formats within the text
-        // This regex finds dates in format "Month DD, YYYY"
-        const dateRegex = /([A-Z][a-z]+ \d{1,2},? \d{4})/g;
-        let dateMatch;
-        
-        while ((dateMatch = dateRegex.exec(text)) !== null) {
-          const dateStr = dateMatch[1];
-          const dateIndex = dateMatch.index;
-          
-          // Get context around the date (100 chars before and after)
-          const contextStart = Math.max(0, dateIndex - 100);
-          const contextEnd = Math.min(text.length, dateIndex + dateStr.length + 100);
-          const context = text.substring(contextStart, contextEnd);
-          
-          // Check if this date appears to be a deadline
-          const deadlineKeywords = [
-            'deadline', 'due', 'by', 'no later than', 'before', 'until',
-            'must', 'shall', 'required', 'submit', 'file', 'complete',
-            'start', 'end', 'expire', 'cutoff', 'close'
-          ];
-          
-          const hasDeadlineContext = deadlineKeywords.some(keyword => 
-            context.toLowerCase().includes(keyword)
-          );
-          
-          if (hasDeadlineContext) {
-            // Extract a description from the context
-            let description = '';
-            
-            // Try to find the sentence or phrase containing the date
-            const sentences = context.split(/[.!?]/);
-            for (const sentence of sentences) {
-              if (sentence.includes(dateStr)) {
-                description = sentence.trim()
-                  .replace(/\s+/g, ' ')
-                  .replace(/^[^a-zA-Z]+/, '') // Remove leading non-letters
-                  .substring(0, 100); // Limit length
-                break;
-              }
-            }
-            
-            // Clean up the description
-            if (description) {
-              // Remove the date from the description to avoid redundancy
-              description = description.replace(dateStr, '').trim();
-              if (description.endsWith(',')) description = description.slice(0, -1);
-              
-              // Don't add duplicates
-              if (!extractedDeadlines.find(d => d.date === dateStr)) {
-                extractedDeadlines.push({
-                  description: description || 'Deadline',
-                  date: dateStr
-                });
-              }
-            }
-          }
-        }
-        
-        // Also check if the text contains specific deadline patterns
-        const specificPatterns = [
-          /Plaintiff Fact Sheet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
-          /Damages Questionnaire[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
-          /Depositions? Start[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
-          /Depositions? Complet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
-          /filed[^.]*?no later than ([A-Z][a-z]+ \d{1,2},? \d{4})/i
-        ];
-        
-        specificPatterns.forEach(pattern => {
-          const match = text.match(pattern);
-          if (match && match[1]) {
-            const date = match[1];
-            const desc = match[0].replace(date, '').trim();
-            
-            if (!extractedDeadlines.find(d => d.date === date)) {
-              extractedDeadlines.push({
-                description: desc.substring(0, 100),
-                date: date
-              });
-            }
-          }
-        });
-        
+        const extractedDeadlines = extractDeadlinesFromText(text);
         if (extractedDeadlines.length > 0) {
           analysisResult.deadlines = extractedDeadlines;
           console.log('Extracted deadlines from text:', extractedDeadlines);
@@ -293,7 +251,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       console.log('Parsed analysis result:', analysisResult);
       setAnalysis(analysisResult);
       
-      // Save to localStorage for this client
+      // Save to localStorage
       const storageKey = `document_analysis_${clientId}_${Date.now()}`;
       localStorage.setItem(storageKey, JSON.stringify({
         fileName,
@@ -305,13 +263,92 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       toast.success('Document analyzed successfully!');
     } catch (error) {
       console.error('Error analyzing document:', error);
-      toast.error('Error analyzing document. Using demo analysis.');
+      toast.error(`Error analyzing document: ${error.message}. Using demo analysis.`);
       
       // Set demo analysis for testing
       setAnalysis(getDemoAnalysis(type));
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const extractDeadlinesFromText = (text) => {
+    const extractedDeadlines = [];
+    
+    // Look for dates in various formats
+    const dateRegex = /([A-Z][a-z]+ \d{1,2},? \d{4})/g;
+    let dateMatch;
+    
+    while ((dateMatch = dateRegex.exec(text)) !== null) {
+      const dateStr = dateMatch[1];
+      const dateIndex = dateMatch.index;
+      
+      const contextStart = Math.max(0, dateIndex - 100);
+      const contextEnd = Math.min(text.length, dateIndex + dateStr.length + 100);
+      const context = text.substring(contextStart, contextEnd);
+      
+      const deadlineKeywords = [
+        'deadline', 'due', 'by', 'no later than', 'before', 'until',
+        'must', 'shall', 'required', 'submit', 'file', 'complete',
+        'start', 'end', 'expire', 'cutoff', 'close'
+      ];
+      
+      const hasDeadlineContext = deadlineKeywords.some(keyword => 
+        context.toLowerCase().includes(keyword)
+      );
+      
+      if (hasDeadlineContext) {
+        let description = '';
+        const sentences = context.split(/[.!?]/);
+        for (const sentence of sentences) {
+          if (sentence.includes(dateStr)) {
+            description = sentence.trim()
+              .replace(/\s+/g, ' ')
+              .replace(/^[^a-zA-Z]+/, '')
+              .substring(0, 100);
+            break;
+          }
+        }
+        
+        if (description) {
+          description = description.replace(dateStr, '').trim();
+          if (description.endsWith(',')) description = description.slice(0, -1);
+          
+          if (!extractedDeadlines.find(d => d.date === dateStr)) {
+            extractedDeadlines.push({
+              description: description || 'Deadline',
+              date: dateStr
+            });
+          }
+        }
+      }
+    }
+    
+    // Also check for specific deadline patterns
+    const specificPatterns = [
+      /Plaintiff Fact Sheet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+      /Damages Questionnaire[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+      /Depositions? Start[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+      /Depositions? Complet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+      /filed[^.]*?no later than ([A-Z][a-z]+ \d{1,2},? \d{4})/i
+    ];
+    
+    specificPatterns.forEach(pattern => {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const date = match[1];
+        const desc = match[0].replace(date, '').trim();
+        
+        if (!extractedDeadlines.find(d => d.date === date)) {
+          extractedDeadlines.push({
+            description: desc.substring(0, 100),
+            date: date
+          });
+        }
+      }
+    });
+    
+    return extractedDeadlines;
   };
 
   const getAnalysisPrompt = (type, text) => {
@@ -389,7 +426,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
   };
 
   const getDemoAnalysis = (type) => {
-    // Return demo analysis based on document type
     const demoAnalyses = {
       'insurance': {
         policyNumber: "HO-123456789",
@@ -753,7 +789,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     return demoAnalyses[type] || demoAnalyses['other'];
   };
 
-  // Fixed button handler functions
   const handleSaveToClientFile = () => {
     try {
       if (!analysis || !fileName) {
@@ -761,14 +796,10 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         return;
       }
 
-      // Make sure clientId and clientName are defined
       const safeClientId = clientId || 'default';
       const safeClientName = clientName || 'Client';
-
-      // Create a unique key for this client's documents
       const clientDocKey = `client_${safeClientId}_documents`;
       
-      // Get existing documents for this client from localStorage
       let existingDocs = [];
       try {
         const stored = localStorage.getItem(clientDocKey);
@@ -780,7 +811,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         existingDocs = [];
       }
       
-      // Create document entry
       const documentEntry = {
         id: Date.now(),
         fileName: fileName,
@@ -791,20 +821,14 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         clientName: safeClientName
       };
       
-      // Add to existing documents array
       existingDocs.push(documentEntry);
-      
-      // Save back to localStorage
       localStorage.setItem(clientDocKey, JSON.stringify(existingDocs));
       
-      // Also save to a general key for backup
       const backupKey = `doc_backup_${Date.now()}`;
       localStorage.setItem(backupKey, JSON.stringify(documentEntry));
       
-      // Show success message
       toast.success(`Document saved to ${safeClientName}'s file successfully!`);
       
-      // Log for debugging
       console.log('Document saved successfully:', documentEntry);
       console.log('Total documents for client:', existingDocs.length);
       
@@ -823,7 +847,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
 
       const safeClientName = clientName || 'Client';
       
-      // Create a comprehensive email summary
       let emailSubject = `Document Analysis Summary: ${fileName}`;
       let emailBody = `Document Analysis Summary\n`;
       emailBody += `========================\n\n`;
@@ -832,11 +855,9 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       emailBody += `Type: ${documentTypes.find(t => t.value === documentType)?.label || 'Unknown'}\n`;
       emailBody += `Analysis Date: ${new Date().toLocaleDateString()}\n\n`;
       
-      // Add key findings based on document type
       emailBody += `KEY FINDINGS:\n`;
       emailBody += `--------------\n`;
       
-      // Add specific content based on document type
       if (documentType === 'insurance' && analysis.coverageLimits) {
         emailBody += `\nCoverage Limits:\n`;
         Object.entries(analysis.coverageLimits).forEach(([key, value]) => {
@@ -847,7 +868,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         }
       }
       
-      // Add recommendations if they exist
       if (analysis.recommendations && analysis.recommendations.length > 0) {
         emailBody += `\nRECOMMENDATIONS:\n`;
         analysis.recommendations.forEach((rec, i) => {
@@ -855,7 +875,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         });
       }
       
-      // Add deadlines if they exist
       if (analysis.deadlines && analysis.deadlines.length > 0) {
         emailBody += `\nIMPORTANT DEADLINES:\n`;
         analysis.deadlines.forEach(deadline => {
@@ -863,7 +882,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         });
       }
       
-      // Add concerns if they exist
       if (analysis.concerns && analysis.concerns.length > 0) {
         emailBody += `\nCONCERNS:\n`;
         analysis.concerns.forEach((concern, i) => {
@@ -871,7 +889,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         });
       }
       
-      // Add advantages if they exist
       if (analysis.advantages && analysis.advantages.length > 0) {
         emailBody += `\nADVANTAGES:\n`;
         analysis.advantages.forEach((advantage, i) => {
@@ -879,12 +896,10 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         });
       }
       
-      // Create mailto link - properly encode the content
       const encodedSubject = encodeURIComponent(emailSubject);
       const encodedBody = encodeURIComponent(emailBody);
       const mailtoLink = `mailto:?subject=${encodedSubject}&body=${encodedBody}`;
       
-      // Use window.location.href instead of window.open to avoid popup blockers
       window.location.href = mailtoLink;
       
       toast.success('Opening email client with summary');
@@ -908,44 +923,37 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       let deadlinesToAdd = [];
       let addedToCalendarCount = 0;
       
-      // Extract deadlines from analysis
       if (analysis.deadlines && Array.isArray(analysis.deadlines) && analysis.deadlines.length > 0) {
         deadlinesToAdd = [...deadlinesToAdd, ...analysis.deadlines];
       }
       
-      // Also check for important dates (in contract analysis)
       if (analysis.importantDates && Array.isArray(analysis.importantDates) && analysis.importantDates.length > 0) {
         deadlinesToAdd = [...deadlinesToAdd, ...analysis.importantDates];
       }
       
       if (deadlinesToAdd.length === 0) {
-        // Use toast without .info method - just plain toast()
         toast('No deadlines found in this document');
         return;
       }
 
-      // Add events to the calendar system if addEvent is available
       if (typeof addEvent === 'function') {
         deadlinesToAdd.forEach(deadline => {
           try {
-            // Parse the date and create a valid date object
             const eventDate = new Date(deadline.date);
             if (isNaN(eventDate.getTime())) {
               console.error('Invalid date:', deadline.date);
               return;
             }
             
-            // Create event object for the calendar
             const calendarEvent = {
               title: `${safeClientName} - ${deadline.description || 'Deadline'}`,
               start: eventDate.toISOString(),
-              end: new Date(eventDate.getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
+              end: new Date(eventDate.getTime() + 60 * 60 * 1000).toISOString(),
               clientId: safeClientId,
               type: 'deadline',
               description: `Source: ${fileName}\nDocument Type: ${documentTypes.find(t => t.value === documentType)?.label || 'Document'}`
             };
             
-            // Add to calendar using the context function
             addEvent(calendarEvent);
             addedToCalendarCount++;
             
@@ -957,7 +965,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         if (addedToCalendarCount > 0) {
           toast.success(`${addedToCalendarCount} deadline(s) added to calendar!`);
           
-          // Option to navigate to calendar
           if (typeof navigate === 'function') {
             setTimeout(() => {
               if (window.confirm('Would you like to view the calendar now?')) {
@@ -966,12 +973,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
             }, 1000);
           }
         }
-      } else {
-        // If addEvent is not available, just create the ICS file
-        console.log('addEvent function not available, creating ICS file only');
       }
       
-      // Save deadlines to localStorage for calendar integration
       const calendarKey = `client_${safeClientId}_deadlines`;
       let existingDeadlines = [];
       
@@ -985,7 +988,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         existingDeadlines = [];
       }
       
-      // Add new deadlines with proper formatting
       const newDeadlines = deadlinesToAdd.map(deadline => ({
         id: Date.now() + Math.random(),
         clientId: safeClientId,
@@ -998,11 +1000,9 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       }));
       
       existingDeadlines = [...existingDeadlines, ...newDeadlines];
-      
-      // Save back to localStorage
       localStorage.setItem(calendarKey, JSON.stringify(existingDeadlines));
       
-      // Create ICS file content for calendar import/export
+      // Create ICS file
       let icsContent = 'BEGIN:VCALENDAR\r\n';
       icsContent += 'VERSION:2.0\r\n';
       icsContent += 'PRODID:-//Law Firm//Document Analyzer//EN\r\n';
@@ -1011,14 +1011,12 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       
       deadlinesToAdd.forEach((deadline, index) => {
         try {
-          // Parse the date and create a valid date object
           const eventDate = new Date(deadline.date);
           if (isNaN(eventDate.getTime())) {
             console.error('Invalid date:', deadline.date);
             return;
           }
           
-          // Format date for ICS file (YYYYMMDD)
           const year = eventDate.getFullYear();
           const month = String(eventDate.getMonth() + 1).padStart(2, '0');
           const day = String(eventDate.getDate()).padStart(2, '0');
@@ -1039,9 +1037,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       
       icsContent += 'END:VCALENDAR\r\n';
       
-      // Ask user if they want to download ICS file as well
       if (window.confirm('Would you also like to download an ICS file for backup or external calendar import?')) {
-        // Create and download ICS file
         const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1051,7 +1047,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         document.body.appendChild(link);
         link.click();
         
-        // Clean up
         setTimeout(() => {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
@@ -1061,7 +1056,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       }
       
       if (!addEvent && deadlinesToAdd.length > 0) {
-        toast.success(`${deadlinesToAdd.length} deadline(s) saved to localStorage. ICS file available for calendar import.`);
+        toast.success(`${deadlinesToAdd.length} deadline(s) saved to localStorage`);
       }
       
     } catch (error) {
@@ -1081,7 +1076,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
   const renderAnalysisResults = () => {
     if (!analysis) return null;
     
-    // Render different UI based on document type
     switch(documentType) {
       case 'insurance':
         return renderInsuranceAnalysis();
@@ -1669,7 +1663,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         {Object.entries(analysis).map(([key, value]) => {
           if (key === 'recommendations' || key === 'concerns' || key === 'advantages' || 
               key === 'strengths' || key === 'weaknesses' || key === 'deadlines') {
-            return null; // These are handled by renderCommonSections
+            return null;
           }
           
           return (
@@ -1781,10 +1775,9 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           <FileText size={20} />
           AI Legal Document Analyzer
         </h3>
-        <p>Upload any legal document for instant AI analysis</p>
+        <p>Upload PDF, Word, or text documents for instant AI analysis</p>
       </div>
 
-      {/* Document Type Selector */}
       <div className="document-type-selector">
         <label>Document Type:</label>
         <select 
@@ -1800,43 +1793,37 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         </select>
       </div>
 
-      {/* Upload Section */}
       <div className="upload-section">
         <label htmlFor="doc-upload" className="upload-area">
           <Upload size={32} />
-          <p>Click to upload document (PDF, TXT, DOC, DOCX)</p>
+          <p>Click to upload document</p>
           <span className="upload-hint">
-            {documentType === 'auto' ? 
-              'Any legal document - will auto-detect type' : 
-              `Upload ${documentTypes.find(t => t.value === documentType)?.label}`
-            }
+            Supports: PDF, Word (.docx), Text (.txt)
           </span>
           <input
             id="doc-upload"
             type="file"
-            accept=".pdf,.txt,.doc,.docx"
+            accept=".pdf,.txt,.doc,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
             onChange={handleFileUpload}
             style={{ display: 'none' }}
           />
         </label>
       </div>
 
-      {/* Status Indicators */}
       {uploading && (
         <div className="status-message">
           <Loader className="spinning" size={20} />
-          Uploading {fileName}...
+          Processing {fileName}...
         </div>
       )}
 
       {analyzing && (
         <div className="status-message">
           <Loader className="spinning" size={20} />
-          Analyzing {documentType === 'auto' ? 'document' : documentTypes.find(t => t.value === documentType)?.label} with AI...
+          Analyzing document with AI... This may take a moment.
         </div>
       )}
 
-      {/* Analysis Results */}
       {analysis && (
         <div className="analysis-results">
           <div className="results-header">
@@ -1859,7 +1846,6 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
 
           {renderAnalysisResults()}
 
-          {/* Action Buttons */}
           <div className="analysis-actions">
             <button 
               className="btn-primary"

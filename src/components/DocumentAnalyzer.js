@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, AlertTriangle, CheckCircle, DollarSign, X, Loader, AlertCircle, Gavel, Search, Scale, Mail, Users, Camera, File, Calendar } from 'lucide-react';
+import { Upload, FileText, AlertTriangle, CheckCircle, DollarSign, X, Loader, AlertCircle, Gavel, Search, Scale, Mail, Users, Camera, File, Calendar, Clock, Building } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
@@ -30,10 +30,11 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     { value: 'deposition', label: 'Deposition', icon: Users },
     { value: 'contract', label: 'Contract/Agreement', icon: FileText },
     { value: 'evidence', label: 'Evidence/Exhibit', icon: Camera },
+    { value: 'motion', label: 'Motion/Brief', icon: Gavel },
     { value: 'other', label: 'Other Legal Document', icon: File }
   ];
 
-  // Extract text from PDF using PDF.js
+  // Extract text from PDF using PDF.js - ENHANCED
   const extractTextFromPDF = async (file) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -44,7 +45,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += pageText + '\n';
+        fullText += `\n--- Page ${i} ---\n${pageText}\n`;
       }
 
       return fullText;
@@ -125,15 +126,16 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       console.log('Extracted text length:', extractedText.length);
       setDocumentText(extractedText);
 
-      // Auto-detect document type from filename if set to auto
+      // Auto-detect document type from filename and content - ENHANCED
+      let detectedType = documentType;
       if (documentType === 'auto') {
-        const detectedType = detectDocumentType(file.name);
+        detectedType = detectDocumentType(file.name, extractedText);
         setDocumentType(detectedType);
         toast(`Detected document type: ${documentTypes.find(t => t.value === detectedType)?.label}`);
       }
 
       // Analyze the document
-      analyzeDocument(extractedText, documentType);
+      analyzeDocument(extractedText, detectedType);
 
     } catch (error) {
       console.error('Error processing file:', error);
@@ -143,10 +145,14 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     }
   };
 
-  const detectDocumentType = (filename) => {
+  // ENHANCED: Now checks both filename and content
+  const detectDocumentType = (filename, text = '') => {
     const lower = filename.toLowerCase();
+    const textLower = text.toLowerCase();
+    
+    // Check filename first
     if (lower.includes('insurance') || lower.includes('policy')) return 'insurance';
-    if (lower.includes('order') || lower.includes('ruling')) return 'court-order';
+    if (lower.includes('order') || lower.includes('ruling') || lower.includes('cmo')) return 'court-order';
     if (lower.includes('discovery') || lower.includes('request')) return 'discovery';
     if (lower.includes('complaint') || lower.includes('petition')) return 'complaint';
     if (lower.includes('settlement') || lower.includes('agreement')) return 'settlement';
@@ -155,6 +161,17 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     if (lower.includes('correspondence') || lower.includes('letter')) return 'correspondence';
     if (lower.includes('contract')) return 'contract';
     if (lower.includes('evidence') || lower.includes('exhibit')) return 'evidence';
+    if (lower.includes('motion') || lower.includes('brief')) return 'motion';
+    
+    // Check content if filename doesn't match
+    if (textLower.includes('case management order') || textLower.includes('court orders')) return 'court-order';
+    if (textLower.includes('insurance policy') || textLower.includes('coverage limit')) return 'insurance';
+    if (textLower.includes('request for production') || textLower.includes('interrogatories')) return 'discovery';
+    if (textLower.includes('plaintiff alleges') || textLower.includes('causes of action')) return 'complaint';
+    if (textLower.includes('deposition of') || (textLower.includes('q:') && textLower.includes('a:'))) return 'deposition';
+    if (textLower.includes('expert opinion') || textLower.includes('expert report')) return 'expert-report';
+    if (textLower.includes('motion to') || textLower.includes('memorandum of points')) return 'motion';
+    
     return 'other';
   };
 
@@ -168,8 +185,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       return;
     }
 
-    // Truncate text if it's too long for the API (keep first 10000 chars)
-    const truncatedText = text.length > 10000 ? text.substring(0, 10000) + '...' : text;
+    // ENHANCED: Increased token limit for better analysis
+    const truncatedText = text.length > 15000 ? text.substring(0, 15000) + '\n\n[Document truncated for analysis...]' : text;
     
     const analysisPrompt = getAnalysisPrompt(type, truncatedText);
     
@@ -185,22 +202,20 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-  model: 'gpt-4',
-  messages: [
-    {
-      role: 'system',
-      content: `You are an expert legal analyst with expertise across all practice areas including civil litigation, family law, criminal defense, immigration, personal injury, business law, and more. 
-               Analyze legal documents and extract key information relevant to the case type.
-               Always respond with valid JSON only.`
-    },
-    {
-      role: 'user',
-      content: analysisPrompt
-    }
-  ],
-  temperature: 0.3,
-  max_tokens: 2000
-})
+          model: 'gpt-4-turbo-preview',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert legal analyst with deep expertise across all practice areas. You provide thorough, detailed analysis of legal documents, extracting key information, identifying critical deadlines, assessing risks and opportunities, and providing strategic recommendations. Always respond with valid, well-structured JSON only.`
+            },
+            {
+              role: 'user',
+              content: analysisPrompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 4000
+        })
       });
 
       const data = await response.json();
@@ -214,6 +229,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       
       let analysisResult;
       try {
+        // Clean markdown if present
+        content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         analysisResult = JSON.parse(content);
       } catch (e) {
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -239,13 +256,23 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         }
       }
       
-      // Extract deadlines from the original document text if not found
+      // ENHANCED: Extract deadlines from original text if not found or insufficient
       if ((!analysisResult.deadlines || analysisResult.deadlines.length === 0) && text) {
         const extractedDeadlines = extractDeadlinesFromText(text);
         if (extractedDeadlines.length > 0) {
           analysisResult.deadlines = extractedDeadlines;
           console.log('Extracted deadlines from text:', extractedDeadlines);
         }
+      }
+      
+      // ENHANCED: Extract parties if not present
+      if ((!analysisResult.parties || analysisResult.parties.length === 0) && text) {
+        analysisResult.parties = extractPartiesFromText(text);
+      }
+      
+      // ENHANCED: Extract monetary amounts if not present
+      if (!analysisResult.monetaryAmounts && text) {
+        analysisResult.monetaryAmounts = extractMonetaryAmounts(text);
       }
       
       console.log('Parsed analysis result:', analysisResult);
@@ -272,57 +299,72 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     }
   };
 
+  // ENHANCED: Better deadline extraction with more patterns
   const extractDeadlinesFromText = (text) => {
     const extractedDeadlines = [];
     
-    // Look for dates in various formats
-    const dateRegex = /([A-Z][a-z]+ \d{1,2},? \d{4})/g;
-    let dateMatch;
+    // Enhanced date patterns
+    const datePatterns = [
+      // Month Day, Year
+      /([A-Z][a-z]+(?:uary|ruary|ch|il|ne|ly|ust|tember|tober|vember|cember))\s+(\d{1,2}),?\s+(\d{4})/g,
+      // MM/DD/YYYY
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/g,
+      // Month Day Year (no comma)
+      /([A-Z][a-z]+)\s+(\d{1,2})\s+(\d{4})/g
+    ];
     
-    while ((dateMatch = dateRegex.exec(text)) !== null) {
-      const dateStr = dateMatch[1];
-      const dateIndex = dateMatch.index;
-      
-      const contextStart = Math.max(0, dateIndex - 100);
-      const contextEnd = Math.min(text.length, dateIndex + dateStr.length + 100);
-      const context = text.substring(contextStart, contextEnd);
-      
-      const deadlineKeywords = [
-        'deadline', 'due', 'by', 'no later than', 'before', 'until',
-        'must', 'shall', 'required', 'submit', 'file', 'complete',
-        'start', 'end', 'expire', 'cutoff', 'close'
-      ];
-      
-      const hasDeadlineContext = deadlineKeywords.some(keyword => 
-        context.toLowerCase().includes(keyword)
-      );
-      
-      if (hasDeadlineContext) {
-        let description = '';
-        const sentences = context.split(/[.!?]/);
-        for (const sentence of sentences) {
-          if (sentence.includes(dateStr)) {
-            description = sentence.trim()
-              .replace(/\s+/g, ' ')
-              .replace(/^[^a-zA-Z]+/, '')
-              .substring(0, 100);
-            break;
-          }
-        }
+    const deadlineKeywords = [
+      'deadline', 'due date', 'due', 'by', 'no later than', 'before', 'until', 'on or before',
+      'must be', 'shall be', 'required by', 'submit', 'file', 'complete', 'respond',
+      'serve', 'e-served', 'served', 'mailed',
+      'start', 'begin', 'commence', 'end', 'expire', 'expiration', 'cutoff', 'close',
+      'hearing', 'trial', 'conference', 'mediation', 'fact sheet'
+    ];
+    
+    datePatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const dateStr = match[0];
+        const dateIndex = match.index;
         
-        if (description) {
-          description = description.replace(dateStr, '').trim();
-          if (description.endsWith(',')) description = description.slice(0, -1);
+        const contextStart = Math.max(0, dateIndex - 150);
+        const contextEnd = Math.min(text.length, dateIndex + dateStr.length + 150);
+        const context = text.substring(contextStart, contextEnd);
+        
+        const hasDeadlineContext = deadlineKeywords.some(keyword => 
+          context.toLowerCase().includes(keyword)
+        );
+        
+        if (hasDeadlineContext) {
+          let description = '';
+          const sentences = context.split(/[.!?;\n]/);
+          for (const sentence of sentences) {
+            if (sentence.includes(dateStr)) {
+              description = sentence.trim()
+                .replace(/\s+/g, ' ')
+                .replace(/^[^a-zA-Z0-9]+/, '')
+                .substring(0, 200);
+              break;
+            }
+          }
           
-          if (!extractedDeadlines.find(d => d.date === dateStr)) {
-            extractedDeadlines.push({
-              description: description || 'Deadline',
-              date: dateStr
-            });
+          if (description) {
+            description = description.replace(dateStr, '').trim();
+            if (description.endsWith(',')) description = description.slice(0, -1);
+            if (description.startsWith(':')) description = description.slice(1).trim();
+            
+            if (!extractedDeadlines.find(d => d.date === dateStr && d.description === description)) {
+              extractedDeadlines.push({
+                description: description || 'Important Date',
+                date: dateStr,
+                priority: description.toLowerCase().includes('immediate') || 
+                         description.toLowerCase().includes('urgent') ? 'high' : 'medium'
+              });
+            }
           }
         }
       }
-    }
+    });
     
     // Also check for specific deadline patterns
     const specificPatterns = [
@@ -330,19 +372,22 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       /Damages Questionnaire[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
       /Depositions? Start[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
       /Depositions? Complet[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
-      /filed[^.]*?no later than ([A-Z][a-z]+ \d{1,2},? \d{4})/i
+      /filed[^.]*?no later than ([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+      /Case Management Order[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i,
+      /Preservation Order[^.]*?([A-Z][a-z]+ \d{1,2},? \d{4})/i
     ];
     
     specificPatterns.forEach(pattern => {
       const match = text.match(pattern);
       if (match && match[1]) {
         const date = match[1];
-        const desc = match[0].replace(date, '').trim();
+        const desc = match[0].replace(date, '').trim().substring(0, 200);
         
         if (!extractedDeadlines.find(d => d.date === date)) {
           extractedDeadlines.push({
-            description: desc.substring(0, 100),
-            date: date
+            description: desc,
+            date: date,
+            priority: 'high'
           });
         }
       }
@@ -351,82 +396,368 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     return extractedDeadlines;
   };
 
+  // NEW: Extract parties from document
+  const extractPartiesFromText = (text) => {
+    const parties = new Set();
+    
+    const patterns = [
+      /Plaintiff[s]?:?\s+([A-Z][A-Za-z\s,\.&]+?)(?:\n|,|v\.|;)/g,
+      /Defendant[s]?:?\s+([A-Z][A-Za-z\s,\.&]+?)(?:\n|,|\.|;)/g,
+      /([A-Z][A-Za-z\s]+)\s+v\.\s+([A-Z][A-Za-z\s]+)/g,
+    ];
+    
+    patterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        for (let i = 1; i < match.length; i++) {
+          if (match[i] && match[i].length > 3 && match[i].length < 100) {
+            parties.add(match[i].trim());
+          }
+        }
+      }
+    });
+    
+    return Array.from(parties).slice(0, 10);
+  };
+
+  // NEW: Extract monetary amounts
+  const extractMonetaryAmounts = (text) => {
+    const amounts = [];
+    const pattern = /\$[\d,]+(?:\.\d{2})?/g;
+    let match;
+    const seen = new Set();
+    
+    while ((match = pattern.exec(text)) !== null) {
+      const amount = match[0];
+      if (!seen.has(amount)) {
+        seen.add(amount);
+        const context = text.substring(Math.max(0, match.index - 50), Math.min(text.length, match.index + 100));
+        amounts.push({
+          amount: amount,
+          context: context.replace(/\s+/g, ' ').trim()
+        });
+      }
+    }
+    
+    return amounts.slice(0, 15);
+  };
+
+  // ENHANCED: More comprehensive prompts for each document type
   const getAnalysisPrompt = (type, text) => {
-    const basePrompt = `Analyze this ${type} document for a fire litigation case. Document text: ${text}\n\n`;
+    const baseInstruction = `Analyze this ${type} document thoroughly and extract all critical information. Document text:\n\n${text}\n\n`;
+    
+    const baseRequirements = `
+IMPORTANT: 
+1. Extract ALL deadlines with their full context and assign priority levels (high/medium/low)
+2. Identify ALL parties involved
+3. List ALL monetary amounts mentioned
+4. Provide detailed strategic recommendations with specific action items
+5. Identify potential risks and opportunities
+6. Note any missing information or concerns
+
+Respond ONLY with valid JSON. Do not include markdown code blocks.`;
     
     switch(type) {
-      case 'insurance':
-        return `${basePrompt} Extract coverage limits, deductibles, exclusions, and fire-specific provisions. 
-                Format as JSON with fields: policyNumber, coverageLimits (object with dwelling, personalProperty, lossOfUse, otherStructures, debrisRemoval), 
-                deductible, totalPossiblePayout, exclusions (array), concerns (array), advantages (array), recommendations (array), 
-                timeLimit, additionalLivingExpense (object with limit and duration).`;
-      
       case 'court-order':
-        return `${basePrompt} Extract: 1) Key rulings/orders, 2) Deadlines imposed, 3) Required actions, 4) Parties affected, 
-                5) Compliance requirements, 6) Important dates. 
-                Format as JSON with fields: orderType, keyRulings (array), deadlines (array of objects with date and description), 
-                requiredActions (array), affectedParties (array), complianceItems (array), recommendations (array).`;
-      
+        return `${baseInstruction}
+
+Extract comprehensive information in JSON format with these fields:
+
+{
+  "orderType": "Type of court order",
+  "caseNumber": "Case number if mentioned",
+  "court": "Court name and jurisdiction",
+  "judge": "Judge name if mentioned",
+  "dateIssued": "Date order was issued",
+  "keyRulings": ["Array of key rulings and decisions"],
+  "deadlines": [
+    {
+      "date": "FULL date string as written (e.g., 'July 10, 2025')",
+      "description": "Complete description of what's due",
+      "priority": "high/medium/low",
+      "party": "Which party must comply"
+    }
+  ],
+  "requiredActions": [
+    {
+      "action": "Description of required action",
+      "deadline": "When it must be done",
+      "responsibleParty": "Who must do it",
+      "consequences": "What happens if not done"
+    }
+  ],
+  "affectedParties": ["All parties affected"],
+  "complianceRequirements": ["All compliance items"],
+  "legalImplications": ["Implications of this order"],
+  "strategicConsiderations": ["Strategic points to consider"],
+  "risks": ["Potential risks"],
+  "opportunities": ["Potential opportunities"],
+  "recommendations": ["Detailed action-oriented recommendations, prefix urgent ones with 'IMMEDIATE:' or 'URGENT:'"]
+}
+
+${baseRequirements}`;
+
+      case 'insurance':
+        return `${baseInstruction}
+
+Extract comprehensive insurance information in JSON format:
+
+{
+  "policyNumber": "Policy number",
+  "policyHolder": "Name of insured",
+  "insurer": "Insurance company name",
+  "coverageLimits": {
+    "dwelling": number,
+    "personalProperty": number,
+    "lossOfUse": number,
+    "otherStructures": number,
+    "liability": number,
+    "debrisRemoval": number
+  },
+  "deductible": number,
+  "totalPossiblePayout": number,
+  "exclusions": ["All exclusions listed"],
+  "timeLimit": "Time limit for claims",
+  "additionalLivingExpense": {
+    "limit": number,
+    "duration": "Duration in months"
+  },
+  "concerns": ["Potential coverage issues"],
+  "advantages": ["Strong coverage points"],
+  "recommendations": ["Detailed action items"]
+}
+
+${baseRequirements}`;
+
+      case 'motion':
+        return `${baseInstruction}
+
+Analyze this motion/brief comprehensively:
+
+{
+  "motionType": "Type of motion",
+  "movingParty": "Who filed it",
+  "opposingParty": "Who it's against",
+  "reliefSought": "What relief is requested",
+  "legalStandard": "Legal standard applied",
+  "factsPresented": ["Key facts argued"],
+  "legalArguments": [
+    {
+      "argument": "Main argument",
+      "authorities": ["Cases/statutes cited"],
+      "strength": "strong/moderate/weak"
+    }
+  ],
+  "deadlines": [{"date": "Date", "description": "Hearing, opposition, reply dates"}],
+  "strengthsOfMotion": ["Strong points"],
+  "weaknessesOfMotion": ["Weak points"],
+  "counterarguments": ["How to oppose"],
+  "recommendations": ["Strategic advice"]
+}
+
+${baseRequirements}`;
+
       case 'discovery':
-        return `${basePrompt} Extract: 1) Documents requested, 2) Response deadline, 3) Interrogatories, 4) Admissions requested, 
-                5) Objectionable requests, 6) Strategy recommendations. 
-                Format as JSON with fields: requestType, documentsRequested (array), interrogatories (array), 
-                deadlines (array of objects with date and description), objectionableItems (array), 
-                strategyNotes, recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Documents requested, 2) Response deadline, 3) Interrogatories, 4) Admissions requested, 
+        5) Objectionable requests, 6) Strategy recommendations. 
+        Format as JSON with fields: requestType, documentsRequested (array), interrogatories (array), 
+        deadlines (array of objects with date, description, and priority), objectionableItems (array), 
+        strategyNotes, recommendations (array).
+
+${baseRequirements}`;
       
       case 'complaint':
-        return `${basePrompt} Extract: 1) Causes of action, 2) Defendants named, 3) Damages claimed, 4) Key allegations, 
-                5) Legal theories, 6) Weaknesses/strengths. 
-                Format as JSON with fields: causesOfAction (array), defendants (array), damagesClaimed (object), 
-                keyAllegations (array), legalTheories (array), strengths (array), weaknesses (array), recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Causes of action, 2) Defendants named, 3) Damages claimed, 4) Key allegations, 
+        5) Legal theories, 6) Weaknesses/strengths. 
+        Format as JSON with fields: causesOfAction (array), defendants (array), damagesClaimed (object), 
+        keyAllegations (array), legalTheories (array), strengths (array), weaknesses (array), recommendations (array).
+
+${baseRequirements}`;
       
       case 'settlement':
-        return `${basePrompt} Extract: 1) Settlement amount, 2) Payment terms, 3) Release provisions, 4) Conditions, 
-                5) Deadlines, 6) Pros/cons. 
-                Format as JSON with fields: settlementAmount (number), paymentTerms, releaseProvisions (array), 
-                conditions (array), deadlines (array of objects with date and description), 
-                advantages (array), disadvantages (array), recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Settlement amount, 2) Payment terms, 3) Release provisions, 4) Conditions, 
+        5) Deadlines, 6) Pros/cons. 
+        Format as JSON with fields: settlementAmount (number), paymentTerms, releaseProvisions (array), 
+        conditions (array), deadlines (array of objects with date and description), 
+        advantages (array), disadvantages (array), recommendations (array).
+
+${baseRequirements}`;
       
       case 'expert-report':
-        return `${basePrompt} Extract: 1) Expert conclusions, 2) Key opinions, 3) Methodology, 4) Supporting evidence, 
-                5) Weaknesses, 6) How to use/counter. 
-                Format as JSON with fields: expertName, conclusions (array), keyOpinions (array), methodology (array), 
-                supportingEvidence (array), weaknesses (array), howToUse, recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Expert conclusions, 2) Key opinions, 3) Methodology, 4) Supporting evidence, 
+        5) Weaknesses, 6) How to use/counter. 
+        Format as JSON with fields: expertName, conclusions (array), keyOpinions (array), methodology (array), 
+        supportingEvidence (array), weaknesses (array), howToUse, recommendations (array).
+
+${baseRequirements}`;
       
       case 'correspondence':
-        return `${basePrompt} Extract: 1) Main points, 2) Any deadlines mentioned, 3) Action items required, 
-                4) Parties involved, 5) Legal implications. 
-                Format as JSON with fields: from, to, date, mainPoints (array), deadlines (array of objects), 
-                actionItems (array), legalImplications (array), recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Main points, 2) Any deadlines mentioned, 3) Action items required, 
+        4) Parties involved, 5) Legal implications. 
+        Format as JSON with fields: from, to, date, mainPoints (array), deadlines (array of objects), 
+        actionItems (array), legalImplications (array), recommendations (array).
+
+${baseRequirements}`;
       
       case 'deposition':
-        return `${basePrompt} Extract: 1) Key testimony, 2) Admissions made, 3) Contradictions, 4) Helpful testimony, 
-                5) Harmful testimony, 6) Follow-up needed. 
-                Format as JSON with fields: deponent, date, keyTestimony (array), admissions (array), 
-                contradictions (array), helpfulPoints (array), harmfulPoints (array), followUpNeeded (array), recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Key testimony, 2) Admissions made, 3) Contradictions, 4) Helpful testimony, 
+        5) Harmful testimony, 6) Follow-up needed. 
+        Format as JSON with fields: deponent, date, keyTestimony (array), admissions (array), 
+        contradictions (array), helpfulPoints (array), harmfulPoints (array), followUpNeeded (array), recommendations (array).
+
+${baseRequirements}`;
       
       case 'contract':
-        return `${basePrompt} Extract: 1) Parties, 2) Key terms, 3) Payment provisions, 4) Termination clauses, 
-                5) Dispute resolution, 6) Important dates. 
-                Format as JSON with fields: parties (array), keyTerms (array), paymentProvisions, 
-                terminationClauses (array), disputeResolution, importantDates (array), concerns (array), recommendations (array).`;
+        return `${baseInstruction}
+
+Extract: 1) Parties, 2) Key terms, 3) Payment provisions, 4) Termination clauses, 
+        5) Dispute resolution, 6) Important dates. 
+        Format as JSON with fields: parties (array), keyTerms (array), paymentProvisions, 
+        terminationClauses (array), disputeResolution, importantDates (array), concerns (array), recommendations (array).
+
+${baseRequirements}`;
       
       case 'evidence':
-        return `${basePrompt} Analyze this evidence/exhibit for: 1) What it proves, 2) Relevance to fire case, 
-                3) Authenticity issues, 4) How to use it, 5) Potential objections. 
-                Format as JSON with fields: exhibitType, whatItProves (array), relevanceToCase, 
-                authenticityIssues (array), howToUse (array), potentialObjections (array), recommendations (array).`;
+        return `${baseInstruction}
+
+Analyze this evidence/exhibit for: 1) What it proves, 2) Relevance to case, 
+        3) Authenticity issues, 4) How to use it, 5) Potential objections. 
+        Format as JSON with fields: exhibitType, whatItProves (array), relevanceToCase, 
+        authenticityIssues (array), howToUse (array), potentialObjections (array), recommendations (array).
+
+${baseRequirements}`;
       
       default:
-        return `${basePrompt} Extract all key information relevant to fire litigation including: 
-                1) Main points, 2) Important dates/deadlines, 3) Action items, 4) Parties involved, 
-                5) Financial implications, 6) Legal implications, 7) Recommendations. 
-                Format as JSON with appropriate fields.`;
+        return `${baseInstruction}
+
+Extract all key information including: 
+        1) Main points, 2) Important dates/deadlines, 3) Action items, 4) Parties involved, 
+        5) Financial implications, 6) Legal implications, 7) Recommendations. 
+        Format as JSON with appropriate fields.
+
+${baseRequirements}`;
     }
   };
 
+  // ENHANCED: Better demo analysis with the screenshot data
   const getDemoAnalysis = (type) => {
     const demoAnalyses = {
+      'court-order': {
+        orderType: "Case Management Order No. 6",
+        caseNumber: "Consolidated Fire Litigation",
+        court: "Superior Court",
+        judge: "Judge Name",
+        dateIssued: "May 15, 2025",
+        keyRulings: [
+          "All fire cases consolidated for pretrial proceedings",
+          "Bellwether trials scheduled for March 2026",
+          "Discovery to proceed in phases",
+          "Preservation Order modified and extended"
+        ],
+        deadlines: [
+          { 
+            date: "Jul 10 2025", 
+            description: "Re Individual Plaintiff Liability Questionnaire; First Amended Preservation Order E-Served",
+            priority: "high",
+            party: "All Plaintiffs"
+          },
+          { 
+            date: "June 2, 2025", 
+            description: "Case Management Orders dated May 15, 2025 ('CMO 3' and 'CMO 4'), and Case Management Order Dated Jun",
+            priority: "high",
+            party: "All Parties"
+          },
+          { 
+            date: "April 3, 2025", 
+            description: "AMENDED PRESERVATION ORDER The Preservation Order entered on , will remain in effect th",
+            priority: "high",
+            party: "All Defendants"
+          },
+          { 
+            date: "January 8, 2025", 
+            description: "the area depicted in larger the map in Appendix A) between 5:30 pm January 7, 2025 and 5:30 pm Janua",
+            priority: "medium",
+            party: "All Parties"
+          }
+        ],
+        requiredActions: [
+          {
+            action: "Complete and file Individual Plaintiff Liability Questionnaires",
+            deadline: "Jul 10 2025",
+            responsibleParty: "All Individual Plaintiffs",
+            consequences: "Case may be dismissed without prejudice for failure to comply"
+          },
+          {
+            action: "Comply with First Amended Preservation Order",
+            deadline: "Ongoing",
+            responsibleParty: "All Defendants",
+            consequences: "Sanctions for spoliation of evidence"
+          },
+          {
+            action: "File plaintiff fact sheets",
+            deadline: "Jul 10 2025",
+            responsibleParty: "All Plaintiffs",
+            consequences: "Delay in case progression"
+          },
+          {
+            action: "Complete document production",
+            deadline: "November 30, 2025",
+            responsibleParty: "All parties",
+            consequences: "Discovery sanctions may apply"
+          }
+        ],
+        affectedParties: ["All plaintiffs", "Utility defendants", "Insurance defendants", "Expert witnesses"],
+        complianceRequirements: [
+          "Monthly status reports required",
+          "Meet and confer before discovery motions",
+          "Electronic filing mandatory",
+          "Preservation obligations ongoing per modified order"
+        ],
+        legalImplications: [
+          "Consolidation streamlines pretrial but may affect individual case strategies",
+          "Bellwether trials will establish precedents affecting all cases",
+          "Discovery coordination reduces costs but requires cooperation",
+          "Preservation order violations could lead to adverse inference instructions"
+        ],
+        strategicConsiderations: [
+          "Position client cases to be included in favorable bellwether group",
+          "Coordinate with other plaintiff counsel on discovery strategies",
+          "Monitor bellwether case developments closely",
+          "Prepare for possibility of global settlement discussions"
+        ],
+        risks: [
+          "Missing critical deadlines could result in case dismissal",
+          "Bellwether losses could negatively impact settlement leverage",
+          "Discovery costs may be higher due to breadth of consolidated cases",
+          "Preservation order violations by defendants could be hard to detect"
+        ],
+        opportunities: [
+          "Shared discovery reduces individual case costs significantly",
+          "Bellwether victories create strong settlement pressure",
+          "Coordination with other counsel provides strategic advantages",
+          "Pattern evidence from multiple cases strengthens claims"
+        ],
+        recommendations: [
+          "IMMEDIATE: Calendar all deadlines with 2-week advance reminders",
+          "IMMEDIATE: Complete plaintiff questionnaires well before July 10 deadline",
+          "SHORT-TERM: Review preservation order with clients to ensure compliance",
+          "ONGOING: Monitor other cases in consolidation for relevant developments",
+          "STRATEGIC: Consider whether client should be in bellwether pool",
+          "STRATEGIC: Begin preparing client for possibility of early settlement"
+        ]
+      },
       'insurance': {
         policyNumber: "HO-123456789",
         coverageLimits: {
@@ -461,35 +792,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           duration: "24 months"
         }
       },
-      'court-order': {
-        orderType: "Case Management Order",
-        keyRulings: [
-          "All fire cases consolidated for pretrial proceedings",
-          "Bellwether trials scheduled for March 2026",
-          "Discovery to proceed in phases"
-        ],
-        deadlines: [
-          { date: "2025-10-15", description: "Plaintiff fact sheets due" },
-          { date: "2025-11-30", description: "Discovery cutoff" },
-          { date: "2025-12-15", description: "Expert designation deadline" }
-        ],
-        requiredActions: [
-          "File plaintiff fact sheets",
-          "Complete document production",
-          "Attend monthly status conferences"
-        ],
-        affectedParties: ["All plaintiffs", "Utility defendants", "Insurance defendants"],
-        complianceItems: [
-          "Monthly status reports required",
-          "Meet and confer before discovery motions",
-          "Electronic filing mandatory"
-        ],
-        recommendations: [
-          "Calendar all deadlines immediately",
-          "Prepare fact sheets early",
-          "Coordinate with co-counsel on discovery plan"
-        ]
-      },
+      // Keep all your other demo analyses...
       'discovery': {
         requestType: "Request for Production of Documents",
         documentsRequested: [
@@ -505,7 +808,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           "State all living expenses incurred"
         ],
         deadlines: [
-          { date: "2025-10-01", description: "Response due (30 days from service)" }
+          { date: "2025-10-01", description: "Response due (30 days from service)", priority: "high" }
         ],
         objectionableItems: [
           "Request #5 is overly broad and unduly burdensome",
@@ -580,8 +883,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           "No admission of liability"
         ],
         deadlines: [
-          { date: "2025-10-30", description: "Acceptance deadline" },
-          { date: "2025-11-15", description: "Payment deadline if accepted" }
+          { date: "2025-10-30", description: "Acceptance deadline", priority: "high" },
+          { date: "2025-11-15", description: "Payment deadline if accepted", priority: "medium" }
         ],
         advantages: [
           "Quick resolution and payment",
@@ -647,8 +950,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           "Confirming meet and confer date"
         ],
         deadlines: [
-          { date: "2025-09-25", description: "Respond regarding settlement conference" },
-          { date: "2025-09-30", description: "Meet and confer scheduled" }
+          { date: "2025-09-25", description: "Respond regarding settlement conference", priority: "medium" },
+          { date: "2025-09-30", description: "Meet and confer scheduled", priority: "medium" }
         ],
         actionItems: [
           "Respond to settlement conference proposal",
@@ -789,6 +1092,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     return demoAnalyses[type] || demoAnalyses['other'];
   };
 
+  // All your existing handler functions remain the same
   const handleSaveToClientFile = () => {
     try {
       if (!analysis || !fileName) {
@@ -868,6 +1172,13 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         }
       }
       
+      if (analysis.keyRulings) {
+        emailBody += `\nKey Rulings:\n`;
+        analysis.keyRulings.forEach((ruling, i) => {
+          emailBody += `${i + 1}. ${ruling}\n`;
+        });
+      }
+      
       if (analysis.recommendations && analysis.recommendations.length > 0) {
         emailBody += `\nRECOMMENDATIONS:\n`;
         analysis.recommendations.forEach((rec, i) => {
@@ -878,7 +1189,9 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       if (analysis.deadlines && analysis.deadlines.length > 0) {
         emailBody += `\nIMPORTANT DEADLINES:\n`;
         analysis.deadlines.forEach(deadline => {
-          emailBody += `- ${deadline.date}: ${deadline.description}\n`;
+          const desc = typeof deadline === 'object' ? deadline.description : deadline;
+          const date = typeof deadline === 'object' ? deadline.date : '';
+          emailBody += `- ${date}: ${desc}\n`;
         });
       }
       
@@ -939,18 +1252,23 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       if (typeof addEvent === 'function') {
         deadlinesToAdd.forEach(deadline => {
           try {
-            const eventDate = new Date(deadline.date);
+            const dateStr = typeof deadline === 'object' ? deadline.date : deadline;
+            const desc = typeof deadline === 'object' ? deadline.description : 'Deadline';
+            const priority = typeof deadline === 'object' ? deadline.priority : 'medium';
+            
+            const eventDate = new Date(dateStr);
             if (isNaN(eventDate.getTime())) {
-              console.error('Invalid date:', deadline.date);
+              console.error('Invalid date:', dateStr);
               return;
             }
             
             const calendarEvent = {
-              title: `${safeClientName} - ${deadline.description || 'Deadline'}`,
+              title: `${safeClientName} - ${desc}`,
               start: eventDate.toISOString(),
               end: new Date(eventDate.getTime() + 60 * 60 * 1000).toISOString(),
               clientId: safeClientId,
               type: 'deadline',
+              priority: priority,
               description: `Source: ${fileName}\nDocument Type: ${documentTypes.find(t => t.value === documentType)?.label || 'Document'}`
             };
             
@@ -992,8 +1310,9 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         id: Date.now() + Math.random(),
         clientId: safeClientId,
         clientName: safeClientName,
-        date: deadline.date,
-        description: deadline.description || 'Deadline',
+        date: typeof deadline === 'object' ? deadline.date : deadline,
+        description: typeof deadline === 'object' ? deadline.description : 'Deadline',
+        priority: typeof deadline === 'object' ? deadline.priority : 'medium',
         source: fileName,
         documentType: documentType,
         addedOn: new Date().toISOString()
@@ -1011,21 +1330,24 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       
       deadlinesToAdd.forEach((deadline, index) => {
         try {
-          const eventDate = new Date(deadline.date);
+          const dateStr = typeof deadline === 'object' ? deadline.date : deadline;
+          const desc = typeof deadline === 'object' ? deadline.description : 'Deadline';
+          
+          const eventDate = new Date(dateStr);
           if (isNaN(eventDate.getTime())) {
-            console.error('Invalid date:', deadline.date);
+            console.error('Invalid date:', dateStr);
             return;
           }
           
           const year = eventDate.getFullYear();
           const month = String(eventDate.getMonth() + 1).padStart(2, '0');
           const day = String(eventDate.getDate()).padStart(2, '0');
-          const dateStr = `${year}${month}${day}`;
+          const dateICS = `${year}${month}${day}`;
           
           icsContent += 'BEGIN:VEVENT\r\n';
-          icsContent += `DTSTART;VALUE=DATE:${dateStr}\r\n`;
-          icsContent += `DTEND;VALUE=DATE:${dateStr}\r\n`;
-          icsContent += `SUMMARY:${safeClientName} - ${deadline.description || 'Deadline'}\r\n`;
+          icsContent += `DTSTART;VALUE=DATE:${dateICS}\r\n`;
+          icsContent += `DTEND;VALUE=DATE:${dateICS}\r\n`;
+          icsContent += `SUMMARY:${safeClientName} - ${desc}\r\n`;
           icsContent += `DESCRIPTION:Source: ${fileName}\\nType: ${documentTypes.find(t => t.value === documentType)?.label || 'Document'}\r\n`;
           icsContent += `UID:${Date.now()}-${index}@lawfirm.com\r\n`;
           icsContent += `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z\r\n`;
@@ -1161,8 +1483,13 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
     <>
       <div className="order-summary">
         <h5>Court Order: {analysis.orderType}</h5>
+        {analysis.caseNumber && <p className="case-info"><strong>Case:</strong> {analysis.caseNumber}</p>}
+        {analysis.court && <p className="case-info"><strong>Court:</strong> {analysis.court}</p>}
+        {analysis.judge && <p className="case-info"><strong>Judge:</strong> {analysis.judge}</p>}
+        {analysis.dateIssued && <p className="case-info"><strong>Issued:</strong> {analysis.dateIssued}</p>}
+        
         <div className="key-rulings">
-          <h6>Key Rulings:</h6>
+          <h6><Gavel size={16} /> Key Rulings:</h6>
           <ul>
             {analysis.keyRulings?.map((ruling, i) => (
               <li key={i}>{ruling}</li>
@@ -1172,10 +1499,19 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         
         {analysis.requiredActions && analysis.requiredActions.length > 0 && (
           <div className="required-actions">
-            <h6>Required Actions:</h6>
+            <h6><AlertCircle size={16} /> Required Actions:</h6>
             <ul>
               {analysis.requiredActions.map((action, i) => (
-                <li key={i}>{action}</li>
+                <li key={i}>
+                  {typeof action === 'object' ? (
+                    <>
+                      <strong>{action.action}</strong>
+                      {action.deadline && <div className="action-detail">Deadline: {action.deadline}</div>}
+                      {action.responsibleParty && <div className="action-detail">Responsible: {action.responsibleParty}</div>}
+                      {action.consequences && <div className="action-detail">Consequences: {action.consequences}</div>}
+                    </>
+                  ) : action}
+                </li>
               ))}
             </ul>
           </div>
@@ -1183,10 +1519,43 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         
         {analysis.affectedParties && analysis.affectedParties.length > 0 && (
           <div className="affected-parties">
-            <h6>Affected Parties:</h6>
+            <h6><Users size={16} /> Affected Parties:</h6>
             <ul>
               {analysis.affectedParties.map((party, i) => (
                 <li key={i}>{party}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {analysis.complianceRequirements && analysis.complianceRequirements.length > 0 && (
+          <div className="compliance-items">
+            <h6><CheckCircle size={16} /> Compliance Requirements:</h6>
+            <ul>
+              {analysis.complianceRequirements.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {analysis.legalImplications && analysis.legalImplications.length > 0 && (
+          <div className="legal-implications">
+            <h6><Scale size={16} /> Legal Implications:</h6>
+            <ul>
+              {analysis.legalImplications.map((impl, i) => (
+                <li key={i}>{impl}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {analysis.strategicConsiderations && analysis.strategicConsiderations.length > 0 && (
+          <div className="strategic-considerations">
+            <h6>Strategic Considerations:</h6>
+            <ul>
+              {analysis.strategicConsiderations.map((cons, i) => (
+                <li key={i}>{cons}</li>
               ))}
             </ul>
           </div>
@@ -1585,7 +1954,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
             <ul>
               {analysis.importantDates.map((date, i) => (
                 <li key={i}>
-                  <strong>{date.date}</strong>: {date.description}
+                  <strong>{typeof date === 'object' ? date.date : date}</strong>: {typeof date === 'object' ? date.description : ''}
                 </li>
               ))}
             </ul>
@@ -1662,7 +2031,8 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         <h5>Document Analysis</h5>
         {Object.entries(analysis).map(([key, value]) => {
           if (key === 'recommendations' || key === 'concerns' || key === 'advantages' || 
-              key === 'strengths' || key === 'weaknesses' || key === 'deadlines') {
+              key === 'strengths' || key === 'weaknesses' || key === 'deadlines' ||
+              key === 'risks' || key === 'opportunities') {
             return null;
           }
           
@@ -1696,21 +2066,52 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
       <div className="deadlines-section">
         <h5>
           <Calendar size={18} />
-          Deadlines
+          Critical Deadlines
         </h5>
-        <ul>
-          {analysis.deadlines.map((deadline, i) => (
-            <li key={i}>
-              <strong>{deadline.date}</strong>: {deadline.description}
-            </li>
-          ))}
-        </ul>
+        <div className="deadlines-list">
+          {analysis.deadlines.map((deadline, i) => {
+            const date = typeof deadline === 'object' ? deadline.date : deadline;
+            const desc = typeof deadline === 'object' ? deadline.description : 'Deadline';
+            const priority = typeof deadline === 'object' ? deadline.priority : 'medium';
+            const party = typeof deadline === 'object' ? deadline.party : '';
+            
+            return (
+              <div key={i} className={`deadline-item priority-${priority}`}>
+                <div className="deadline-date"><strong>{date}</strong></div>
+                <div className="deadline-description">{desc}</div>
+                {party && <div className="deadline-party">Party: {party}</div>}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
   const renderCommonSections = () => (
     <>
+      {analysis.risks && analysis.risks.length > 0 && (
+        <div className="analysis-section risks">
+          <h5><AlertTriangle size={18} /> Risks</h5>
+          <ul>
+            {analysis.risks.map((risk, i) => (
+              <li key={i}>{risk}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
+      {analysis.opportunities && analysis.opportunities.length > 0 && (
+        <div className="analysis-section opportunities">
+          <h5><CheckCircle size={18} /> Opportunities</h5>
+          <ul>
+            {analysis.opportunities.map((opp, i) => (
+              <li key={i}>{opp}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
       {analysis.concerns && analysis.concerns.length > 0 && (
         <div className="analysis-section concerns">
           <h5><AlertTriangle size={18} /> Concerns</h5>
@@ -1759,9 +2160,14 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
         <div className="analysis-section recommendations">
           <h5><AlertCircle size={18} /> Recommendations</h5>
           <ul>
-            {analysis.recommendations.map((rec, i) => (
-              <li key={i}>{rec}</li>
-            ))}
+            {analysis.recommendations.map((rec, i) => {
+              const isUrgent = rec.toUpperCase().includes('IMMEDIATE') || rec.toUpperCase().includes('URGENT');
+              return (
+                <li key={i} className={isUrgent ? 'urgent' : ''}>
+                  {rec}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -1775,7 +2181,7 @@ const DocumentAnalyzer = ({ clientId, clientName, addEvent, navigate }) => {
           <FileText size={20} />
           AI Legal Document Analyzer
         </h3>
-        <p>Upload PDF, Word, or text documents for instant AI analysis</p>
+        <p>Upload PDF, Word, or text documents for comprehensive AI analysis</p>
       </div>
 
       <div className="document-type-selector">

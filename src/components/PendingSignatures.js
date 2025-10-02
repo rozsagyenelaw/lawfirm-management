@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Clock, CheckCircle, AlertCircle, Copy } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, Copy, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const PendingSignatures = () => {
   const [pendingSessions, setPendingSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     // Listen to all signing sessions in real-time
@@ -32,6 +33,23 @@ const PendingSignatures = () => {
     const link = `${window.location.origin}/sign/${sessionId}`;
     navigator.clipboard.writeText(link);
     toast.success('Link copied to clipboard!');
+  };
+
+  const deleteSession = async (sessionId, documentName) => {
+    if (!window.confirm(`Are you sure you want to delete the signature request for "${documentName}"?`)) {
+      return;
+    }
+
+    setDeleting(sessionId);
+    try {
+      await deleteDoc(doc(db, 'signingSessions', sessionId));
+      toast.success('Signature request deleted successfully');
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      toast.error('Failed to delete signature request');
+    } finally {
+      setDeleting(null);
+    }
   };
 
   if (loading) {
@@ -103,24 +121,45 @@ const PendingSignatures = () => {
                       Sent: {new Date(session.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <button
-                    onClick={() => copyLink(session.sessionId)}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#007bff',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Copy size={14} />
-                    Copy Link
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => copyLink(session.sessionId)}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Copy size={14} />
+                      Copy Link
+                    </button>
+                    <button
+                      onClick={() => deleteSession(session.id, session.documentName)}
+                      disabled={deleting === session.id}
+                      style={{
+                        padding: '6px 12px',
+                        background: deleting === session.id ? '#ccc' : '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: deleting === session.id ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      {deleting === session.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -174,22 +213,43 @@ const PendingSignatures = () => {
                       On: {new Date(session.signedAt).toLocaleDateString()}
                     </div>
                   </div>
-                  {session.signedDocumentUrl && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {session.signedDocumentUrl && (
+                      <button
+                        onClick={() => window.open(session.signedDocumentUrl, '_blank')}
+                        style={{
+                          padding: '6px 12px',
+                          background: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        View
+                      </button>
+                    )}
                     <button
-                      onClick={() => window.open(session.signedDocumentUrl, '_blank')}
+                      onClick={() => deleteSession(session.id, session.documentName)}
+                      disabled={deleting === session.id}
                       style={{
                         padding: '6px 12px',
-                        background: '#28a745',
+                        background: deleting === session.id ? '#ccc' : '#dc3545',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
+                        cursor: deleting === session.id ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}
                     >
-                      View
+                      <Trash2 size={14} />
+                      {deleting === session.id ? 'Deleting...' : 'Delete'}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))}
